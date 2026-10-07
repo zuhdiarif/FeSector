@@ -1,11 +1,12 @@
 import React from "react"
 import { Metadata } from "next"
 import Link from "next/link"
-import { StockCard } from "@/src/entities/stock"
+import { StockCard, AnomalyBadge } from "@/src/entities/stock"
 import { CompositeAlertHero, getPrimaryAlert, getAlertFeed } from "@/src/features/composite-alert"
 import { getWatchedStocks } from "@/src/features/watchlist"
 import { getForeignFlowSummary } from "@/src/features/foreign-flow"
 import { getArticlesFeed } from "@/src/features/sentiment"
+import { getMarketSummary, getStockQuotes, StockQuote } from "@/src/features/market"
 
 export const metadata: Metadata = {
   title: "Dashboard Utama",
@@ -13,13 +14,22 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const [primaryAlert, stocks, feedItems, flowAnomalies, liveArticles] = await Promise.all([
+  const [primaryAlert, stocks, feedItems, flowAnomalies, liveArticles, marketSummary, quotes] = await Promise.all([
     getPrimaryAlert(),
     getWatchedStocks(),
     getAlertFeed(),
     getForeignFlowSummary(),
     getArticlesFeed("BBRI"),
+    getMarketSummary(),
+    getStockQuotes(),
   ])
+
+  const quoteMap = new Map<string, StockQuote>()
+  for (const q of quotes) {
+    if (q && q.ticker) {
+      quoteMap.set(q.ticker.toUpperCase(), q)
+    }
+  }
 
   const anomalyCount = flowAnomalies.filter((a) => Math.abs(a.z_score) >= 2.0).length || 1
   const topAnomaly = flowAnomalies.find((a) => Math.abs(a.z_score) >= 2.0)
@@ -27,22 +37,41 @@ export default async function DashboardPage() {
     ? `${anomalyCount} Anomali Masif (${topAnomaly.ticker}: ${topAnomaly.z_score.toFixed(1)}σ)`
     : "Kondisi Aliran Normal"
 
-  const activityRows = ["BBCA", "BBRI", "BMRI", "BBNI"].map((ticker) => {
-    const anom = flowAnomalies.find((a) => a.ticker === ticker)
+  const targetAnomalies = flowAnomalies.length > 0
+    ? flowAnomalies
+    : feedItems.slice(0, 4).map((f, idx) => ({
+        id: idx + 1,
+        ticker: f.ticker,
+        tanggal: new Date().toISOString(),
+        net_foreign_inflow: f.zScore > 0 ? 100000000000 : -100000000000,
+        z_score: f.zScore,
+        status_anomali: f.zScore <= -2.0 ? "ANOMALI_OUTFLOW" : f.zScore >= 2.0 ? "ANOMALI_INFLOW" : "NORMAL",
+        broker_details: [],
+      }))
+
+  const activityRows = targetAnomalies.map((anom) => {
+    const ticker = anom.ticker
     const alert = feedItems.find((f) => f.ticker === ticker)
-    const dominantBroker = anom?.broker_details?.[0]
-      ? `${anom.broker_details[0].kode_broker} (${anom.broker_details[0].nama_broker})`
-      : ticker === "BBCA"
-      ? "ZP (Maybank Kim Eng)"
-      : ticker === "BMRI"
-      ? "AK (UBS Sekuritas)"
-      : "BK (J.P. Morgan)"
-    const net1dValue = anom ? anom.net_foreign_inflow : ticker === "BBCA" ? 142000000000 : ticker === "BMRI" ? 41000000000 : 18000000000
-    const net5dValue = anom ? anom.net_foreign_inflow * 3.5 : ticker === "BBCA" ? 510000000000 : ticker === "BMRI" ? 205000000000 : 48000000000
-    const zScore = anom ? anom.z_score : alert?.zScore ?? (ticker === "BBCA" ? 1.1 : ticker === "BMRI" ? 0.4 : 0.1)
-    const isOutflowAnomaly = zScore <= -2.0
-    const isInflowAnomaly = zScore >= 2.0
-    const statusText = isOutflowAnomaly ? "Anomali Outflow" : isInflowAnomaly ? "Anomali Inflow" : zScore > 0 ? "Normal Buy" : "Netral"
+    const topBroker = anom.broker_details && anom.broker_details.length > 0 ? anom.broker_details[0] : undefined
+    const dominantBroker = topBroker
+      ? `${topBroker.kode_broker} (${topBroker.nama_broker})`
+      : "- (Tidak Tersedia)"
+
+    const net1dValue = anom.net_foreign_inflow ?? 0
+    const net5dValue = anom.broker_details && anom.broker_details.length > 0
+      ? anom.broker_details.reduce((acc, b) => acc + (b.net_value ?? 0), 0)
+      : net1dValue * 2.5
+    const zScore = anom.z_score ?? alert?.zScore ?? 0
+    const isOutflowAnomaly = anom.status_anomali === "ANOMALI_OUTFLOW" || zScore <= -2.0
+    const isInflowAnomaly = anom.status_anomali === "ANOMALI_INFLOW" || zScore >= 2.0
+    const statusText = isOutflowAnomaly
+      ? "Anomali Outflow"
+      : isInflowAnomaly
+      ? "Anomali Inflow"
+      : zScore > 0
+      ? "Normal Buy"
+      : "Netral"
+
     return {
       ticker,
       net1d: `${net1dValue >= 0 ? "+" : "-"}Rp ${(Math.abs(net1dValue) / 1e9).toFixed(0)} M`,
@@ -57,14 +86,21 @@ export default async function DashboardPage() {
 
   const enrichedStocks = stocks.map((s) => {
     const alert = feedItems.find((f) => f.ticker === s.ticker)
+    const quote = quoteMap.get(s.ticker.toUpperCase())
     const isAlertTrigger = s.ticker === primaryAlert.ticker || alert?.status === "Perhatian Khusus"
     const zScore = alert?.zScore ?? 0
     const flowStatus = zScore <= -2.0 ? ("outflow" as const) : zScore >= 2.0 ? ("inflow" as const) : ("normal" as const)
     const flowLabel = zScore <= -2.0 ? `Outflow (${zScore}σ)` : zScore >= 2.0 ? `Inflow (+${zScore}σ)` : "Normal"
 
+    const livePrice = quote?.price ?? s.price
+    const livePriceChange = quote?.change_percent ?? quote?.change ?? s.priceChange
+    const liveCoverage = quote?.analystCoverage ?? quote?.analyst_coverage ?? s.analystCoverage ?? 24
+
     return {
       ...s,
-      analystCoverage: 28,
+      price: livePrice,
+      priceChange: livePriceChange,
+      analystCoverage: liveCoverage,
       isAlertTrigger,
       alertMessage: alert?.title,
       pillarMetrics: {
@@ -76,6 +112,15 @@ export default async function DashboardPage() {
       },
     }
   })
+
+  const benchmarkPercent =
+    typeof marketSummary.ihsg_change_percent === "number"
+      ? `${marketSummary.ihsg_change_percent >= 0 ? "+" : ""}${marketSummary.ihsg_change_percent.toFixed(2).replace(".", ",")}%`
+      : String(marketSummary.ihsg_change_percent || "+0,42%")
+  const isBenchmarkPositive = !benchmarkPercent.startsWith("-")
+  const marketStatusLabel = marketSummary.market_status || "Sesi II Berakhir"
+  const marketTimeLabel = marketSummary.market_time || "17:00:00 WIB"
+  const sectorLabel = marketSummary.top_sector || marketSummary.sector_leader || "Perbankan Big-4 (KBMI 4)"
 
   return (
     <div className="flex flex-col w-full pb-space-lg">
@@ -93,7 +138,7 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-space-xs px-space-sm py-space-xs bg-surface-card rounded border border-border-subtle">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-red" />
             <span className="font-body-sm text-body-sm text-text-primary font-medium">
-              Perbankan Big-4 (KBMI 4)
+              {sectorLabel}
             </span>
             <span className="material-symbols-outlined text-[14px] text-text-secondary">
               expand_more
@@ -104,15 +149,17 @@ export default async function DashboardPage() {
         <div className="flex items-center gap-space-md">
           <div className="flex items-center gap-space-xs px-space-sm py-space-xs bg-surface-card rounded border border-border-subtle">
             <span className="w-2 h-2 rounded-full bg-data-neutral" />
-            <span className="font-caption text-caption text-text-secondary">Sesi II Berakhir</span>
+            <span className="font-caption text-caption text-text-secondary">{marketStatusLabel}</span>
             <span className="text-border-subtle">•</span>
             <span className="font-mono text-tabular-sm text-text-primary font-medium">
-              17:00:00 WIB
+              {marketTimeLabel}
             </span>
           </div>
           <div className="flex items-center gap-1.5 bg-surface-container-lowest px-space-sm py-space-xs rounded border border-border-subtle">
             <span className="font-caption text-caption text-text-secondary">Benchmark:</span>
-            <span className="font-mono text-tabular-sm text-data-bullish">+0,42%</span>
+            <span className={`font-mono text-tabular-sm ${isBenchmarkPositive ? "text-data-bullish" : "text-data-bearish"}`}>
+              {benchmarkPercent}
+            </span>
           </div>
         </div>
       </div>
@@ -271,25 +318,35 @@ export default async function DashboardPage() {
                       {row.zScore}
                     </td>
                     <td className="px-space-sm text-text-secondary">
-                      <span className={`font-mono text-tabular-sm font-medium ${row.isAlert ? "text-data-bearish font-bold" : "text-text-primary"}`}>{row.broker.split(" ")[0]}</span> {row.broker.substring(row.broker.indexOf(" "))}
+                      <span className={`font-mono text-tabular-sm font-medium ${row.isAlert ? "text-data-bearish font-bold" : "text-text-primary"}`}>
+                        {row.broker.split(" ")[0]}
+                      </span>{" "}
+                      {row.broker.includes(" ") ? row.broker.substring(row.broker.indexOf(" ") + 1) : ""}
                     </td>
                     <td className="px-space-sm text-center">
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-caption text-[11px] font-medium ${
-                        row.isAlert
-                          ? "bg-data-bearish/20 text-data-bearish font-bold border border-data-bearish/30"
-                          : row.isPositive
-                          ? "bg-data-bullish/10 text-data-bullish"
-                          : "bg-surface-container-high text-text-secondary"
-                      }`}>
-                        {row.status}
-                      </span>
+                      {row.status === "Anomali Outflow" ? (
+                        <AnomalyBadge type="outflow" label="Anomali Outflow" size="sm" />
+                      ) : row.status === "Anomali Inflow" ? (
+                        <AnomalyBadge type="inflow" label="Anomali Inflow" size="sm" />
+                      ) : (
+                        <span
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded font-mono tracking-tight text-[11px] font-medium ${
+                            row.isAlert
+                              ? "bg-data-bearish/20 text-data-bearish font-bold border border-data-bearish/30"
+                              : row.isPositive
+                              ? "bg-data-bullish/10 text-data-bullish"
+                              : "bg-surface-container-high text-text-secondary"
+                          }`}
+                        >
+                          {row.status}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-
 
           <div className="mt-space-md pt-space-xs flex items-center justify-between text-text-secondary font-caption text-caption border-t border-border-subtle/40">
             <span>Ambang batas anomali diset otomatis pada |Z| &gt; 2.0σ</span>
@@ -363,7 +420,7 @@ export default async function DashboardPage() {
               </span>
             </div>
 
-            <div className="flex flex-col gap-space-sm divide-y divide-border-subtle/40">
+            <div className="flex flex-col gap-space-sm divide-y border-subtle/40">
               {liveArticles.slice(0, 3).map((art, idx) => {
                 const isBullish = art.sentimentScore >= 0.2
                 const isBearish = art.sentimentScore <= -0.2
@@ -398,7 +455,6 @@ export default async function DashboardPage() {
                   </div>
                 )
               })}
-
             </div>
 
             <div className="mt-space-md pt-space-sm border-t border-border-subtle/50">
@@ -411,7 +467,6 @@ export default async function DashboardPage() {
               </Link>
             </div>
           </div>
-
         </div>
       </div>
     </div>

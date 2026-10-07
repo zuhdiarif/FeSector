@@ -5,6 +5,7 @@ import { StatusBadge } from "@/src/shared/ui/StatusBadge"
 import { getFundamentalScore } from "@/src/features/fundamental"
 import { getSentimentData } from "@/src/features/sentiment"
 import { getForeignFlowData } from "@/src/features/foreign-flow"
+import { getMarketSummary, getStockQuotes } from "@/src/features/market"
 
 export const metadata: Metadata = {
   title: "Perbandingan Komparatif Antar-Saham",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ComparePage() {
-  const [bbcaFund, bmriFund, bbriFund, bbcaSent, bmriSent, bbriSent, bbcaFlow, bmriFlow, bbriFlow] = await Promise.all([
+  const [bbcaFund, bmriFund, bbriFund, bbcaSent, bmriSent, bbriSent, bbcaFlow, bmriFlow, bbriFlow, marketSummary, quotes] = await Promise.all([
     getFundamentalScore("BBCA"),
     getFundamentalScore("BMRI"),
     getFundamentalScore("BBRI"),
@@ -22,7 +23,13 @@ export default async function ComparePage() {
     getForeignFlowData("BBCA"),
     getForeignFlowData("BMRI"),
     getForeignFlowData("BBRI"),
+    getMarketSummary(),
+    getStockQuotes(),
   ])
+
+  const bbcaQuote = quotes.find((q) => q.ticker === "BBCA")
+  const bmriQuote = quotes.find((q) => q.ticker === "BMRI")
+  const bbriQuote = quotes.find((q) => q.ticker === "BBRI")
   return (
     <div className="flex flex-col w-full pb-space-xl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-space-md pb-space-lg mb-space-lg border-b border-border-subtle/60">
@@ -87,7 +94,7 @@ export default async function ComparePage() {
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-data-neutral" /> BMRI</span>
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-brand-red" /> BBRI</span>
             </div>
-            <span>Update: 17:00 WIB</span>
+            <span>Update: {marketSummary.market_time || "17:00 WIB"}</span>
           </div>
         </div>
 
@@ -213,6 +220,28 @@ export default async function ComparePage() {
                 <td className="px-space-md py-space-sm font-mono">3.10x</td>
                 <td className="px-space-md py-space-sm font-mono text-data-bullish font-bold">1.80x (Termurah)</td>
                 <td className="px-space-md py-space-sm font-mono">2.38x</td>
+              </tr>
+
+              <tr className="hover:bg-surface-container-low">
+                <td className="px-space-md py-space-sm font-semibold text-text-primary">Harga Terakhir & Return</td>
+                <td className="px-space-md py-space-sm font-mono font-bold">
+                  Rp {bbcaQuote?.price?.toLocaleString("id-ID") ?? "10.250"}{" "}
+                  <span className={`text-[11px] ${((bbcaQuote?.change_percent ?? 0) >= 0) ? "text-data-bullish" : "text-data-bearish"}`}>
+                    ({(bbcaQuote?.change_percent ?? 0) >= 0 ? "+" : ""}{bbcaQuote?.change_percent ?? 1.23}%)
+                  </span>
+                </td>
+                <td className="px-space-md py-space-sm font-mono font-bold">
+                  Rp {bmriQuote?.price?.toLocaleString("id-ID") ?? "6.950"}{" "}
+                  <span className={`text-[11px] ${((bmriQuote?.change_percent ?? 0) >= 0) ? "text-data-bullish" : "text-data-bearish"}`}>
+                    ({(bmriQuote?.change_percent ?? 0) >= 0 ? "+" : ""}{bmriQuote?.change_percent ?? 0.72}%)
+                  </span>
+                </td>
+                <td className="px-space-md py-space-sm font-mono font-bold">
+                  Rp {bbriQuote?.price?.toLocaleString("id-ID") ?? "4.720"}{" "}
+                  <span className={`text-[11px] ${((bbriQuote?.change_percent ?? 0) >= 0) ? "text-data-bullish" : "text-data-bearish"}`}>
+                    ({(bbriQuote?.change_percent ?? 0) >= 0 ? "+" : ""}{bbriQuote?.change_percent ?? -2.48}%)
+                  </span>
+                </td>
               </tr>
 
               <tr className="hover:bg-surface-container-low">

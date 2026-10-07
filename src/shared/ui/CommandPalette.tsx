@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { sanitizeSearchInput } from "@/src/shared/lib/security"
 
 export interface CommandPaletteProps {
   isOpen: boolean
@@ -45,10 +46,11 @@ const CommandPaletteModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
+  const cleanQuery = query.toLowerCase().trim()
   const filteredItems = ITEMS.filter(
     (item) =>
-      item.title.toLowerCase().includes(query.toLowerCase()) ||
-      item.subtitle.toLowerCase().includes(query.toLowerCase())
+      item.title.toLowerCase().includes(cleanQuery) ||
+      item.subtitle.toLowerCase().includes(cleanQuery)
   )
 
   useEffect(() => {
@@ -118,8 +120,10 @@ const CommandPaletteModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
             aria-controls="palette-listbox"
             aria-activedescendant={filteredItems[selectedIndex]?.id}
             value={query}
+            maxLength={80}
             onChange={(e) => {
-              setQuery(e.target.value)
+              const sanitized = sanitizeSearchInput(e.target.value, 80)
+              setQuery(sanitized)
               setSelectedIndex(0)
             }}
             placeholder="Ketik rute, ticker saham, atau fitur terminal..."
@@ -227,4 +231,3 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   if (!isOpen) return null
   return <CommandPaletteModal onClose={onClose} />
 }
-

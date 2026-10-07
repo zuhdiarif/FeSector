@@ -8,6 +8,7 @@ import { ForeignFlowChart, getForeignFlowData } from "@/src/features/foreign-flo
 import { StockModeView, getBeginnerBrief, getGlossary } from "@/src/features/beginner-brief"
 import { StatusBadge } from "@/src/shared/ui/StatusBadge"
 import { isValidTicker } from "@/src/shared/lib"
+import { getStockQuotes } from "@/src/features/market"
 
 interface Props {
   params: Promise<{ ticker: string }>
@@ -236,15 +237,29 @@ export default async function StockDetailPage({ params }: Props) {
   }
   const upperTicker = ticker.toUpperCase()
 
-  const [fundamentalData, sentimentData, foreignFlowData, brief, glossary] = await Promise.all([
+  const [fundamentalData, sentimentData, foreignFlowData, brief, glossary, quotes] = await Promise.all([
     getFundamentalScore(upperTicker),
     getSentimentData(upperTicker),
     getForeignFlowData(upperTicker),
     getBeginnerBrief(upperTicker),
     getGlossary(),
+    getStockQuotes(),
   ])
 
-  const profile = getStockProfile(upperTicker, fundamentalData.bankName)
+  const initialProfile = getStockProfile(upperTicker, fundamentalData.bankName)
+  const quote = quotes.find((q) => q.ticker.toUpperCase() === upperTicker)
+  const profile: StockProfile = quote
+    ? {
+        ...initialProfile,
+        lastPrice: quote.price ? `Rp ${quote.price.toLocaleString("id-ID")}` : initialProfile.lastPrice,
+        priceChange: quote.change !== undefined ? `${quote.change >= 0 ? "+" : ""}${quote.change}` : initialProfile.priceChange,
+        priceChangePercent: quote.change_percent !== undefined ? `${quote.change_percent >= 0 ? "+" : ""}${quote.change_percent.toFixed(2).replace(".", ",")}%` : initialProfile.priceChangePercent,
+        isBullish: (quote.change_percent ?? quote.change ?? 0) >= 0,
+        volume: quote.volume ? `${(quote.volume / 1e6).toFixed(2)} M Lbr` : initialProfile.volume,
+        marketCap: quote.market_cap ? `Rp ${(quote.market_cap / 1e12).toFixed(2)} T` : initialProfile.marketCap,
+        analystConsensus: quote.analyst_coverage ? `${quote.analyst_coverage} Analis` : initialProfile.analystConsensus,
+      }
+    : initialProfile
 
   return (
     <div className="flex flex-col w-full pb-space-xl">

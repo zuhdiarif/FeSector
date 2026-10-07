@@ -267,15 +267,43 @@ export const BANK_WATCHLIST_META: Record<
   BNGA: { name: "PT Bank CIMB Niaga Tbk", subsector: "Bank KBMI 3", category: "KBMI 3", price: 1890, priceChange: 1.10 },
 }
 
+export interface BackendStockQuote {
+  ticker?: string
+  name?: string
+  price?: number
+  close?: number
+  change?: number
+  change_percent?: number
+  changePercent?: number
+  analyst_coverage?: number
+  analystCoverage?: number
+}
+
 export async function getWatchedStocks(): Promise<WatchedStock[]> {
-  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
   try {
-    const [fundRes, flowRes] = await Promise.all([
-      fetch(`${baseUrl}/api/v1/fundamental-score`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/v1/foreign-flow/summary`, { cache: "no-store" }),
+    const [fundRes, flowRes, quoteRes] = await Promise.all([
+      fetch(`${baseUrl}/api/v1/fundamental-score`, { cache: "no-store" }).catch(() => null),
+      fetch(`${baseUrl}/api/v1/foreign-flow/summary`, { cache: "no-store" }).catch(() => null),
+      fetch(`${baseUrl}/api/v1/stocks/quotes`, { cache: "no-store" }).catch(() => null),
     ])
 
-    if (fundRes.ok) {
+    let quotesList: BackendStockQuote[] = []
+    if (quoteRes && quoteRes.ok) {
+      try {
+        const quoteJson = await quoteRes.json()
+        quotesList = Array.isArray(quoteJson) ? quoteJson : quoteJson.data || []
+      } catch {
+      }
+    }
+    const quoteMap = new Map<string, BackendStockQuote>()
+    for (const q of quotesList) {
+      if (q && q.ticker) {
+        quoteMap.set(q.ticker.toUpperCase(), q)
+      }
+    }
+
+    if (fundRes && fundRes.ok) {
       const fundJson = await fundRes.json()
       const fundList: BackendFundamentalScore[] = Array.isArray(fundJson)
         ? fundJson
@@ -283,7 +311,7 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
 
       if (Array.isArray(fundList) && fundList.length > 0) {
         let flowAnomalies: BackendForeignFlowAnomaly[] = []
-        if (flowRes.ok) {
+        if (flowRes && flowRes.ok) {
           try {
             const flowJson = await flowRes.json()
             flowAnomalies = Array.isArray(flowJson) ? flowJson : flowJson.data || []
@@ -319,6 +347,11 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
             price: 2500,
             priceChange: 0.0,
           }
+
+          const quote = quoteMap.get(item.ticker.toUpperCase())
+          const livePrice = quote?.price ?? quote?.close ?? meta.price
+          const livePriceChange = quote?.change_percent ?? quote?.changePercent ?? quote?.change ?? meta.priceChange
+          const liveCoverage = quote?.analyst_coverage ?? quote?.analystCoverage ?? 24
 
           const score = Math.round(item.skor_akhir ?? 70)
           const anomaly = anomalyMap.get(item.ticker)
@@ -388,12 +421,23 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
             ingestionDetail,
             fundamentalScore: score,
             status,
-            price: meta.price,
-            priceChange: meta.priceChange,
+            price: livePrice,
+            priceChange: livePriceChange,
+            analystCoverage: liveCoverage,
           }
         })
       }
     }
+
+    return MOCK_WATCHED_STOCKS.map((stock) => {
+      const quote = quoteMap.get(stock.ticker.toUpperCase())
+      return {
+        ...stock,
+        price: quote?.price ?? quote?.close ?? stock.price,
+        priceChange: quote?.change_percent ?? quote?.changePercent ?? quote?.change ?? stock.priceChange,
+        analystCoverage: quote?.analyst_coverage ?? quote?.analystCoverage ?? 24,
+      }
+    })
   } catch {
   }
   return MOCK_WATCHED_STOCKS

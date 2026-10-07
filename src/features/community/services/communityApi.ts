@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/src/shared/lib/constants"
+import { sanitizeTicker, sanitizeTextInput } from "@/src/shared/lib/security"
 import { CommunityAlert, CommunityPost, CrowdSentiment, SortOrder } from "../types"
 
 export const MOCK_COMMUNITY_POSTS: Record<string, CommunityPost[]> = {
@@ -146,20 +147,25 @@ export async function getCommunityPosts(
   sort: SortOrder = "hot",
   limit: number = 20
 ): Promise<CommunityPost[]> {
+  const cleanTicker = ticker ? sanitizeTicker(ticker) : null
+  const validSorts: SortOrder[] = ["hot", "top", "new", "controversial"]
+  const safeSort = validSorts.includes(sort) ? sort : "hot"
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 100)
   const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
+
   try {
     const url = new URL(`${baseUrl}/api/v1/community/posts`)
-    if (ticker) url.searchParams.set("ticker", ticker.toUpperCase())
-    url.searchParams.set("sort", sort)
-    url.searchParams.set("limit", limit.toString())
+    if (cleanTicker) url.searchParams.set("ticker", cleanTicker)
+    url.searchParams.set("sort", safeSort)
+    url.searchParams.set("limit", safeLimit.toString())
 
     const res = await fetch(url.toString(), { cache: "no-store" })
     if (res.ok) {
       const data = await res.json()
       if (Array.isArray(data)) {
         if (data.length > 0) return data
-        if (ticker && MOCK_COMMUNITY_POSTS[ticker.toUpperCase()]) {
-          return MOCK_COMMUNITY_POSTS[ticker.toUpperCase()]
+        if (cleanTicker && MOCK_COMMUNITY_POSTS[cleanTicker]) {
+          return MOCK_COMMUNITY_POSTS[cleanTicker]
         }
         return []
       }
@@ -167,17 +173,18 @@ export async function getCommunityPosts(
   } catch {
   }
 
-  if (ticker && MOCK_COMMUNITY_POSTS[ticker.toUpperCase()]) {
-    return MOCK_COMMUNITY_POSTS[ticker.toUpperCase()]
+  if (cleanTicker && MOCK_COMMUNITY_POSTS[cleanTicker]) {
+    return MOCK_COMMUNITY_POSTS[cleanTicker]
   }
   return [...(MOCK_COMMUNITY_POSTS.BBRI || []), ...(MOCK_COMMUNITY_POSTS.BBCA || [])]
 }
 
 export async function getCrowdSentiment(ticker: string): Promise<CrowdSentiment> {
-  const upperTicker = ticker.toUpperCase()
+  const cleanTicker = sanitizeTicker(ticker) || "BBRI"
   const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
+
   try {
-    const res = await fetch(`${baseUrl}/api/v1/community/${upperTicker}/sentiment`, {
+    const res = await fetch(`${baseUrl}/api/v1/community/${encodeURIComponent(cleanTicker)}/sentiment`, {
       cache: "no-store",
     })
     if (res.ok) {
@@ -189,12 +196,12 @@ export async function getCrowdSentiment(ticker: string): Promise<CrowdSentiment>
   } catch {
   }
 
-  if (MOCK_CROWD_SENTIMENTS[upperTicker]) {
-    return MOCK_CROWD_SENTIMENTS[upperTicker]
+  if (MOCK_CROWD_SENTIMENTS[cleanTicker]) {
+    return MOCK_CROWD_SENTIMENTS[cleanTicker]
   }
 
   return {
-    ticker: upperTicker,
+    ticker: cleanTicker,
     sentiment_score: 0.15,
     bullish_percent: 55.0,
     bearish_percent: 45.0,
@@ -259,28 +266,44 @@ export async function createCommunityPost(data: {
   sentiment_tag: "BULLISH" | "BEARISH" | "NEUTRAL"
   username?: string
 }): Promise<CommunityPost> {
+  const cleanTicker = sanitizeTicker(data.ticker) || "BBRI"
+  const cleanTitle = sanitizeTextInput(data.title, 150)
+  const cleanContent = sanitizeTextInput(data.content, 2000)
+  const cleanUsername = sanitizeTextInput(data.username || "investor_ritel", 50)
+  const validTags = ["BULLISH", "BEARISH", "NEUTRAL"]
+  const cleanSentiment = validTags.includes(data.sentiment_tag) ? data.sentiment_tag : "NEUTRAL"
+
+  const payload = {
+    ticker: cleanTicker,
+    title: cleanTitle,
+    content: cleanContent,
+    sentiment_tag: cleanSentiment,
+    username: cleanUsername,
+  }
+
   const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
   try {
     const res = await fetch(`${baseUrl}/api/v1/community/posts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
     if (res.ok) {
       return await res.json()
     }
   } catch {
   }
+
   return {
     id: Date.now(),
     user_id: 999,
-    username: data.username || "investor_ritel",
+    username: cleanUsername,
     user_badge: "Member",
     user_karma: 10,
-    ticker: data.ticker.toUpperCase(),
-    title: data.title,
-    content: data.content,
-    sentiment_tag: data.sentiment_tag,
+    ticker: cleanTicker,
+    title: cleanTitle,
+    content: cleanContent,
+    sentiment_tag: cleanSentiment,
     upvotes: 1,
     downvotes: 0,
     weighted_score: 1.0,
@@ -295,17 +318,21 @@ export async function voteCommunityPost(
   direction: 1 | -1 | 0,
   username?: string
 ): Promise<{ success: boolean; effective_score: number }> {
+  const safePostId = Math.floor(Math.abs(Number(postId))) || 0
+  const safeDirection: 1 | -1 | 0 = direction === 1 ? 1 : direction === -1 ? -1 : 0
+  const safeUsername = sanitizeTextInput(username || "ritel_voter", 50)
+
   const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${baseUrl}/api/v1/community/posts/${postId}/vote`, {
+    const res = await fetch(`${baseUrl}/api/v1/community/posts/${safePostId}/vote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ direction, username: username || "ritel_voter" }),
+      body: JSON.stringify({ direction: safeDirection, username: safeUsername }),
     })
     if (res.ok) {
       return await res.json()
     }
   } catch {
   }
-  return { success: true, effective_score: direction * 1.5 }
+  return { success: true, effective_score: safeDirection * 1.5 }
 }

@@ -12,6 +12,7 @@ export interface WatchedStock {
   status: StatusType | "STABLE" | "WARNING" | "CRITICAL" | "Stabil" | "Waspada" | "Perhatian Khusus"
   price: number
   priceChange: number
+  analystCoverage?: number
 }
 
 export interface SearchStockResult {
