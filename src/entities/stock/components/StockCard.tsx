@@ -31,7 +31,6 @@ export const StockCard: React.FC<StockCardProps> = ({ stock, className }) => {
   const flowLabel = stock.pillarMetrics?.foreignFlowLabel ?? ""
   const isOutflowAnomaly = flowStatus === "outflow" || flowLabel.toLowerCase().includes("outflow")
   const isInflowAnomaly = flowStatus === "inflow" || flowLabel.toLowerCase().includes("inflow")
-  const hasAnomaly = isOutflowAnomaly || isInflowAnomaly
 
   return (
     <div
@@ -63,15 +62,8 @@ export const StockCard: React.FC<StockCardProps> = ({ stock, className }) => {
             </span>
           </div>
 
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex flex-col items-end shrink-0">
             <StatusBadge status={stock.status} size="sm" />
-            {hasAnomaly && (
-              <AnomalyBadge
-                type={isOutflowAnomaly ? "outflow" : "inflow"}
-                label={isOutflowAnomaly ? "Anomali Outflow" : "Anomali Inflow"}
-                size="sm"
-              />
-            )}
           </div>
         </div>
 

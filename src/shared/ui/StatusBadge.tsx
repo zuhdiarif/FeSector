@@ -37,7 +37,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       dot: "bg-data-neutral",
     },
     [StatusType.CRITICAL]: {
-      label: STATUS_LABELS.CRITICAL,
+      label: size === "sm" ? "Perhatian" : STATUS_LABELS.CRITICAL,
       container: "bg-data-bearish/15 text-data-bearish border-data-bearish/30",
       dot: "bg-data-bearish",
     },
