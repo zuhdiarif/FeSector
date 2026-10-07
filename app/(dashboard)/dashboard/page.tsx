@@ -4,9 +4,10 @@ import Link from "next/link"
 import { StockCard, AnomalyBadge } from "@/src/entities/stock"
 import { CompositeAlertHero, getPrimaryAlert, getAlertFeed } from "@/src/features/composite-alert"
 import { getWatchedStocks } from "@/src/features/watchlist"
-import { getForeignFlowSummary } from "@/src/features/foreign-flow"
+import { getForeignFlowSummary, getForeignFlowData } from "@/src/features/foreign-flow"
 import { getArticlesFeed } from "@/src/features/sentiment"
 import { getMarketSummary, getStockQuotes, StockQuote } from "@/src/features/market"
+import { getSectorRanking, getSectorAlerts, SectorRotationAlertBanner } from "@/src/features/sectors"
 
 export const metadata: Metadata = {
   title: "Dashboard Utama",
@@ -14,7 +15,21 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const [primaryAlert, stocks, feedItems, flowAnomalies, liveArticles, marketSummary, quotes] = await Promise.all([
+  const [
+    primaryAlert,
+    stocks,
+    feedItems,
+    flowAnomalies,
+    liveArticles,
+    marketSummary,
+    quotes,
+    sectorRanking,
+    sectorAlerts,
+    bbcaFlow,
+    bbriFlow,
+    bmriFlow,
+    bbniFlow,
+  ] = await Promise.all([
     getPrimaryAlert(),
     getWatchedStocks(),
     getAlertFeed(),
@@ -22,6 +37,12 @@ export default async function DashboardPage() {
     getArticlesFeed("BBRI"),
     getMarketSummary(),
     getStockQuotes(),
+    getSectorRanking(),
+    getSectorAlerts(),
+    getForeignFlowData("BBCA"),
+    getForeignFlowData("BBRI"),
+    getForeignFlowData("BMRI"),
+    getForeignFlowData("BBNI"),
   ])
 
   const quoteMap = new Map<string, StockQuote>()
@@ -37,58 +58,88 @@ export default async function DashboardPage() {
     ? `${anomalyCount} Anomali Masif (${topAnomaly.ticker}: ${topAnomaly.z_score.toFixed(1)}σ)`
     : "Kondisi Aliran Normal"
 
+  const bankFlowMap: Record<string, typeof bbcaFlow> = {
+    BBCA: bbcaFlow,
+    BBRI: bbriFlow,
+    BMRI: bmriFlow,
+    BBNI: bbniFlow,
+  }
+
   const baseTickers = ["BBCA", "BBRI", "BMRI", "BBNI"]
-  const anomalyTickers = flowAnomalies.map((a) => a.ticker.toUpperCase())
-  const allRowTickers = Array.from(new Set([...baseTickers, ...anomalyTickers]))
 
-  const activityRows = allRowTickers.map((ticker) => {
-    const anom = flowAnomalies.find((a) => a.ticker.toUpperCase() === ticker)
-    const alert = feedItems.find((f) => f.ticker.toUpperCase() === ticker)
-    const quote = quoteMap.get(ticker)
+  const activityRows = baseTickers.map((ticker) => {
+    const flowData = bankFlowMap[ticker]
+    const net1dVal = flowData.yesterdayFlow
+    const points5 = (flowData.flowPoints || []).slice(-5)
+    const sum5d = points5.reduce((acc, p) => acc + (p.netFlow || 0), 0)
+    const zScoreVal = flowData.yesterdayZScore
 
-    const topBroker =
-      anom?.broker_details && anom.broker_details.length > 0
-        ? anom.broker_details[0]
-        : undefined
-
-    const dominantBroker = topBroker
-      ? `${topBroker.kode_broker} (${topBroker.nama_broker})`
+    const dominantBrokerObj = flowData.anomalies14d?.[0]?.dominantBroker
+    const dominantBroker = dominantBrokerObj
+      ? `${dominantBrokerObj.code} (${dominantBrokerObj.name.split(" ")[0]})`
       : "- (Normal)"
 
-    const net1dValue = anom
-      ? anom.net_foreign_inflow
-      : alert
-      ? Math.round(alert.zScore * 35000000000)
-      : quote
-      ? Math.round(((quote.change_percent ?? 0) / 100) * (quote.volume ?? 50000000) * 100)
-      : 0
-
-    const net5dValue = anom
-      ? Math.round(anom.net_foreign_inflow * 2.8)
-      : Math.round(net1dValue * 3.2)
-
-    const zScore = anom ? anom.z_score : alert?.zScore ?? 0
-    const isOutflowAnomaly = (anom && anom.status_anomali === "ANOMALI_OUTFLOW") || zScore <= -2.0
-    const isInflowAnomaly = (anom && anom.status_anomali === "ANOMALI_INFLOW") || zScore >= 2.0
+    const isOutflowAnomaly = zScoreVal <= -2.0
+    const isInflowAnomaly = zScoreVal >= 2.0
     const statusText = isOutflowAnomaly
       ? "Anomali Outflow"
       : isInflowAnomaly
       ? "Anomali Inflow"
-      : zScore > 0
+      : zScoreVal > 0
       ? "Normal Buy"
       : "Netral"
 
     return {
       ticker,
-      net1d: `${net1dValue >= 0 ? "+" : "-"}Rp ${(Math.abs(net1dValue) / 1e9).toFixed(0)} M`,
-      net5d: `${net5dValue >= 0 ? "+" : "-"}Rp ${(Math.abs(net5dValue) / 1e9).toFixed(0)} M`,
-      zScore: `${zScore >= 0 ? "+" : ""}${zScore.toFixed(1)}σ`,
+      net1d: `${net1dVal >= 0 ? "+" : "-"}Rp ${(Math.abs(net1dVal) / 1e9).toFixed(0)} M`,
+      net5d: `${sum5d >= 0 ? "+" : "-"}Rp ${Math.abs(Math.round(sum5d))} M`,
+      zScore: `${zScoreVal >= 0 ? "+" : ""}${zScoreVal.toFixed(1)}σ`,
       broker: dominantBroker,
       status: statusText,
       isAlert: isOutflowAnomaly,
-      isPositive: net1dValue >= 0,
+      isPositive: net1dVal >= 0,
     }
   })
+
+  const bankFlows = [bbcaFlow, bbriFlow, bmriFlow, bbniFlow]
+  const allFlowDates = Array.from(
+    new Set(bankFlows.flatMap((b) => (b.flowPoints || []).map((p) => p.date)))
+  ).sort()
+  const recent5Dates = allFlowDates.slice(-5)
+
+  const fiveDayData = recent5Dates.length > 0
+    ? recent5Dates.map((dateStr, idx) => {
+        let buy = 0
+        let sell = 0
+        for (const b of bankFlows) {
+          const pt = (b.flowPoints || []).find((p) => p.date === dateStr)
+          if (pt) {
+            if (pt.netFlow > 0) buy += pt.netFlow
+            else if (pt.netFlow < 0) sell += Math.abs(pt.netFlow)
+          }
+        }
+        const d = new Date(dateStr)
+        const dayName = !isNaN(d.getTime())
+          ? d.toLocaleDateString("id-ID", { weekday: "short" })
+          : dateStr
+        const isLatest = idx === recent5Dates.length - 1
+        return {
+          date: dateStr,
+          label: isLatest ? "Hari Ini" : dayName,
+          buy: Math.round(buy),
+          sell: Math.round(sell),
+          isLatest,
+        }
+      })
+    : [
+        { date: "1", label: "Senin", buy: 250, sell: 120, isLatest: false },
+        { date: "2", label: "Selasa", buy: 310, sell: 180, isLatest: false },
+        { date: "3", label: "Rabu", buy: 280, sell: 210, isLatest: false },
+        { date: "4", label: "Kamis", buy: 190, sell: 260, isLatest: false },
+        { date: "5", label: "Hari Ini", buy: 240, sell: 350, isLatest: true },
+      ]
+
+  const maxFlow = Math.max(1, ...fiveDayData.map((d) => Math.max(d.buy, d.sell)))
 
   const enrichedStocks = stocks.map((s) => {
     const alert = feedItems.find((f) => f.ticker === s.ticker)
@@ -126,7 +177,7 @@ export default async function DashboardPage() {
   const isBenchmarkPositive = !benchmarkPercent.startsWith("-")
   const marketStatusLabel = marketSummary.market_status || marketSummary.market_status_text || "Pasar Tutup"
   const marketTimeLabel = marketSummary.market_time || marketSummary.wib_time || "17:00:00 WIB"
-  const sectorLabel = marketSummary.top_sector || marketSummary.leading_sector || marketSummary.sector_leader || "Perbankan Big-4 (KBMI 4)"
+  const sectorLabel = sectorRanking[0]?.sector_name || marketSummary.leading_sector || "Perbankan Big 4"
 
   return (
     <div className="flex flex-col w-full pb-space-lg">
@@ -141,15 +192,18 @@ export default async function DashboardPage() {
               Ringkasan Sektor Finansial
             </h1>
           </div>
-          <div className="flex items-center gap-space-xs px-space-sm py-space-xs bg-surface-card rounded border border-border-subtle">
+          <Link
+            href="/sectors"
+            className="flex items-center gap-space-xs px-space-sm py-space-xs bg-surface-card hover:bg-surface-container-high rounded border border-border-subtle transition-colors"
+          >
             <span className="w-1.5 h-1.5 rounded-full bg-brand-red" />
             <span className="font-body-sm text-body-sm text-text-primary font-medium">
               {sectorLabel}
             </span>
             <span className="material-symbols-outlined text-[14px] text-text-secondary">
-              expand_more
+              chevron_right
             </span>
-          </div>
+          </Link>
         </div>
 
         <div className="flex items-center gap-space-md">
@@ -171,6 +225,12 @@ export default async function DashboardPage() {
       </div>
 
       <CompositeAlertHero alert={primaryAlert} />
+
+      {sectorAlerts.length > 0 && (
+        <div className="mb-space-md">
+          <SectorRotationAlertBanner alert={sectorAlerts[0]} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-lg">
         {enrichedStocks.length === 0 ? (
@@ -238,55 +298,42 @@ export default async function DashboardPage() {
             </div>
 
             <div className="w-full h-20 flex items-end justify-between pt-2 px-space-xs">
-              <div className="flex flex-col items-center gap-1 flex-1">
-                <div className="w-full flex items-center justify-center gap-1 h-12">
-                  <div className="w-3 bg-data-bullish/70 h-8 rounded-t-xs" />
-                  <div className="w-3 bg-data-bearish/70 h-4 rounded-t-xs" />
-                  <div className="w-3 bg-data-bullish/70 h-6 rounded-t-xs" />
-                  <div className="w-3 bg-data-bullish/70 h-3 rounded-t-xs" />
-                </div>
-                <span className="font-mono text-[10px] text-text-secondary">Senin</span>
-              </div>
-
-              <div className="flex flex-col items-center gap-1 flex-1">
-                <div className="w-full flex items-center justify-center gap-1 h-12">
-                  <div className="w-3 bg-data-bullish/70 h-10 rounded-t-xs" />
-                  <div className="w-3 bg-data-bearish/70 h-8 rounded-t-xs" />
-                  <div className="w-3 bg-data-bullish/70 h-7 rounded-t-xs" />
-                  <div className="w-3 bg-data-bearish/70 h-2 rounded-t-xs" />
-                </div>
-                <span className="font-mono text-[10px] text-text-secondary">Selasa</span>
-              </div>
-
-              <div className="flex flex-col items-center gap-1 flex-1">
-                <div className="w-full flex items-center justify-center gap-1 h-12">
-                  <div className="w-3 bg-data-bullish/70 h-11 rounded-t-xs" />
-                  <div className="w-3 bg-data-bearish/70 h-9 rounded-t-xs" />
-                  <div className="w-3 bg-data-bullish/70 h-5 rounded-t-xs" />
-                  <div className="w-3 bg-data-bullish/70 h-4 rounded-t-xs" />
-                </div>
-                <span className="font-mono text-[10px] text-text-secondary">Rabu</span>
-              </div>
-
-              <div className="flex flex-col items-center gap-1 flex-1">
-                <div className="w-full flex items-center justify-center gap-1 h-12">
-                  <div className="w-3 bg-data-bullish/70 h-7 rounded-t-xs" />
-                  <div className="w-3 bg-data-bearish/80 h-12 rounded-t-xs" />
-                  <div className="w-3 bg-data-bullish/70 h-9 rounded-t-xs" />
-                  <div className="w-3 bg-data-bullish/70 h-5 rounded-t-xs" />
-                </div>
-                <span className="font-mono text-[10px] text-text-secondary">Kamis</span>
-              </div>
-
-              <div className="flex flex-col items-center gap-1 flex-1 bg-brand-red-soft/20 rounded py-0.5 border border-brand-red/30">
-                <div className="w-full flex items-center justify-center gap-1 h-12">
-                  <div className="w-3 bg-data-bullish h-11 rounded-t-xs" />
-                  <div className="w-3 bg-data-bearish h-full rounded-t-xs animate-pulse" />
-                  <div className="w-3 bg-data-bullish h-6 rounded-t-xs" />
-                  <div className="w-3 bg-data-bullish h-3 rounded-t-xs" />
-                </div>
-                <span className="font-mono text-[10px] text-brand-red font-bold">Hari Ini</span>
-              </div>
+              {fiveDayData.map((day) => {
+                const buyHeight = day.buy > 0 ? Math.min(100, Math.max(12, Math.round((day.buy / maxFlow) * 100))) : 0
+                const sellHeight = day.sell > 0 ? Math.min(100, Math.max(12, Math.round((day.sell / maxFlow) * 100))) : 0
+                return (
+                  <div
+                    key={day.date}
+                    className={`flex flex-col items-center gap-1 flex-1 ${
+                      day.isLatest
+                        ? "bg-brand-red-soft/20 rounded py-0.5 border border-brand-red/30"
+                        : ""
+                    }`}
+                  >
+                    <div className="w-full flex items-end justify-center gap-1.5 h-12">
+                      <div
+                        className="w-3 bg-data-bullish rounded-t-xs transition-all"
+                        style={{ height: `${buyHeight}%` }}
+                        title={`Net Buy: Rp ${day.buy} M`}
+                      />
+                      <div
+                        className={`w-3 bg-data-bearish rounded-t-xs transition-all ${
+                          day.isLatest ? "animate-pulse" : ""
+                        }`}
+                        style={{ height: `${sellHeight}%` }}
+                        title={`Net Sell: Rp ${day.sell} M`}
+                      />
+                    </div>
+                    <span
+                      className={`font-mono text-[10px] ${
+                        day.isLatest ? "text-brand-red font-bold" : "text-text-secondary"
+                      }`}
+                    >
+                      {day.label}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
@@ -370,6 +417,66 @@ export default async function DashboardPage() {
           <div className="flex flex-col bg-surface-card p-space-lg rounded border border-border-subtle shadow-sm">
             <div className="flex items-center justify-between mb-space-sm">
               <div className="flex items-center gap-space-xs">
+                <span className="material-symbols-outlined text-[20px] text-brand-red">
+                  autorenew
+                </span>
+                <h3 className="font-headline-sm text-headline-sm text-text-primary font-semibold">
+                  Rotasi Sektor IDX Teratas (SMRS Engine)
+                </h3>
+              </div>
+              <Link
+                href="/sectors"
+                className="text-brand-red hover:underline font-mono text-[11px] font-semibold flex items-center gap-0.5"
+              >
+                <span>Lihat Semua</span>
+                <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+              </Link>
+            </div>
+
+            <div className="flex flex-col gap-space-xs divide-y divide-border-subtle/40">
+              {sectorRanking.slice(0, 3).map((sec, idx) => {
+                const isLeading = sec.status === "LEADING"
+                const isImproving = sec.status === "IMPROVING"
+                const statusBadgeClass = isLeading
+                  ? "bg-data-bullish/15 text-data-bullish border border-data-bullish/30"
+                  : isImproving
+                  ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                  : "bg-surface-container-high text-text-secondary"
+                return (
+                  <div key={sec.sector_slug} className="flex items-center justify-between pt-space-xs first:pt-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[11px] font-bold text-text-secondary w-4">
+                        #{idx + 1}
+                      </span>
+                      <div className="flex flex-col">
+                        <Link
+                          href={`/sectors/${sec.sector_slug}`}
+                          className="font-body-sm text-[13px] text-text-primary font-medium hover:text-brand-red transition-colors"
+                        >
+                          {sec.sector_name.split("(")[0].trim()}
+                        </Link>
+                        <span className="font-mono text-[10px] text-text-secondary">
+                          Net Flow: {sec.net_foreign_flow >= 0 ? "+" : "-"}Rp {(Math.abs(sec.net_foreign_flow) / 1e9).toFixed(0)} M
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${statusBadgeClass}`}>
+                        {sec.status}
+                      </span>
+                      <span className="font-mono text-tabular-sm font-bold text-text-primary min-w-[36px] text-right">
+                        {sec.smrs_score.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-col bg-surface-card p-space-lg rounded border border-border-subtle shadow-sm">
+            <div className="flex items-center justify-between mb-space-sm">
+              <div className="flex items-center gap-space-xs">
                 <span className="material-symbols-outlined text-[20px] text-data-neutral">
                   gavel
                 </span>
@@ -407,7 +514,7 @@ export default async function DashboardPage() {
             </div>
 
             <p className="font-body-sm text-body-sm text-text-secondary leading-relaxed">
-              Sinyal &lsquo;Higher-for-Longer&rsquo; Bank Indonesia memperketat likuiditas simpanan dana murah (CASA). Segmen mikro memiliki sensitivitas CoF tertinggi di KBMI 4.
+              {primaryAlert.summary || "Sinyal higher-for-longer dan kebijakan makroprudensial Bank Indonesia dipantau aktif terhadap margin bunga kredit dan stabilitas rasio simpanan perbankan."}
             </p>
           </div>
 

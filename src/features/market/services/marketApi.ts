@@ -72,10 +72,10 @@ export function getWibTimeAndStatus(date: Date = new Date()) {
 export function computeLiveMarketSummary(base?: Partial<MarketSummary>): MarketSummary {
   const { formattedTime, status } = getWibTimeAndStatus()
   return {
-    ihsg_index: base?.ihsg_index ?? 7287.69,
-    ihsg_change: base?.ihsg_change ?? 0.03,
-    ihsg_change_percent: base?.ihsg_change_percent ?? 0.03,
-    ihsg_change_points: base?.ihsg_change_points ?? 0.03,
+    ihsg_index: base?.ihsg_index ?? 6148.92,
+    ihsg_change: base?.ihsg_change ?? 0.49,
+    ihsg_change_percent: base?.ihsg_change_percent ?? 0.49,
+    ihsg_change_points: base?.ihsg_change_points ?? 0.49,
     ihsg_status: base?.ihsg_status ?? "BULLISH",
     total_foreign_flow: base?.total_foreign_flow ?? 31353332109,
     total_foreign_flow_idr: base?.total_foreign_flow_idr ?? 31353332109,
@@ -94,9 +94,9 @@ export function computeLiveMarketSummary(base?: Partial<MarketSummary>): MarketS
 }
 
 export const DEFAULT_MARKET_SUMMARY: MarketSummary = {
-  ihsg_index: 7287.69,
-  ihsg_change_percent: 0.03,
-  ihsg_change_points: 0.03,
+  ihsg_index: 6148.92,
+  ihsg_change_percent: 0.49,
+  ihsg_change_points: 30.13,
   total_foreign_flow: 31353332109,
   total_foreign_flow_idr: 31353332109,
   total_foreign_flow_formatted: "+Rp 31 M",
@@ -207,9 +207,22 @@ export async function getMarketSummary(): Promise<MarketSummary> {
       if (data && (data.ihsg_index !== undefined || data.total_foreign_flow_formatted !== undefined)) {
         const liveInfo = getWibTimeAndStatus()
         return {
-          ihsg_index: data.ihsg_index ?? 7321.98,
-          ihsg_change: data.ihsg_change ?? 30.75,
-          ihsg_change_percent: data.ihsg_change_percent ?? 0.42,
+          ihsg_index: data.ihsg_index ?? 6148.92,
+          ihsg_change: (() => {
+            const raw = data.ihsg_change ?? data.ihsg_change_percent_float
+            if (typeof raw === "number") return raw
+            return 0.49
+          })(),
+          ihsg_change_percent: (() => {
+            const raw = data.ihsg_change_percent_float ?? data.ihsg_change_percent ?? data.ihsg_change
+            if (typeof raw === "number") return raw
+            if (typeof raw === "string") {
+              const cleaned = raw.replace("%", "").replace("+", "").replace(",", ".")
+              const parsed = parseFloat(cleaned)
+              if (!isNaN(parsed)) return parsed
+            }
+            return 0.49
+          })(),
           ihsg_change_points: data.ihsg_change_points ?? 30.75,
           ihsg_status: data.ihsg_status ?? "BULLISH",
           total_foreign_flow: data.total_foreign_flow ?? data.total_foreign_flow_idr ?? 210000000000,

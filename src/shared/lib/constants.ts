@@ -1,7 +1,8 @@
 export const APP_NAME = "Sectors.Intel"
 export const APP_DESCRIPTION = "Financial Sector Intelligence Dashboard"
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
+export const API_BASE_URL =
+  process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 export const STATUS = {
   STABLE: "STABLE",

@@ -21,7 +21,7 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
   const [searchValue, setSearchValue] = useState("")
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const [marketSummary, setMarketSummary] = useState<MarketSummary>(DEFAULT_MARKET_SUMMARY)
-  const [wibTime, setWibTime] = useState<string>("17:00:00 WIB")
+  const [wibTime, setWibTime] = useState<string>("--:--:-- WIB")
   const [currentStatus, setCurrentStatus] = useState<string>("Pasar Tutup")
   const mounted = useSyncExternalStore(
     () => () => {},
@@ -45,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
       })
     }
     fetchSummary()
-    const summaryInterval = setInterval(fetchSummary, 30000)
+    const summaryInterval = setInterval(fetchSummary, 5000)
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -68,12 +68,18 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })
-      : String(marketSummary.ihsg_index || "7.321,98")
+      : String(marketSummary.ihsg_index || "6.148,92")
 
-  const ihsgChangeRaw =
-    typeof marketSummary.ihsg_change_percent === "number"
-      ? `${marketSummary.ihsg_change_percent >= 0 ? "+" : ""}${marketSummary.ihsg_change_percent.toFixed(2).replace(".", ",")}%`
-      : String(marketSummary.ihsg_change_percent || "+0,42%")
+  const ihsgChangeRaw = (() => {
+    const pct = marketSummary.ihsg_change_percent
+    if (typeof pct === "number") {
+      const sign = pct >= 0 ? "+" : ""
+      return `${sign}${pct.toFixed(2).replace(".", ",")}%`
+    }
+    const s = String(pct || "+0,49%")
+    if (s.includes(",")) return s.endsWith("%") ? s : s + "%"
+    return s.replace(".", ",").endsWith("%") ? s.replace(".", ",") : s.replace(".", ",") + "%"
+  })()
 
   const isIhsgPositive = !ihsgChangeRaw.startsWith("-")
 
@@ -177,7 +183,7 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
           <div className="hidden lg:flex items-center gap-space-xs px-space-sm py-space-xs border border-border-subtle rounded bg-surface-card/80 select-none hover:bg-surface-card transition-colors">
             <span className={`w-1.5 h-1.5 rounded-full ${isMarketOpen ? "bg-data-bullish animate-pulse" : "bg-data-neutral animate-pulse"}`} />
             <span className="font-mono tracking-tight font-semibold text-tabular-sm text-text-secondary">
-              {mounted ? wibTime : (marketSummary.market_time || "17:00:00 WIB")}
+              {mounted ? wibTime : (marketSummary.market_time || "--:--:-- WIB")}
             </span>
             <span className="text-border-subtle">•</span>
             <span className="font-caption text-caption text-text-secondary">{marketStatus}</span>
