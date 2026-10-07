@@ -104,7 +104,7 @@ export const MOCK_ALERT_FEED: AlertFeedItem[] = [
   },
 ]
 
-interface BackendCompositeAlert {
+export interface BackendCompositeAlert {
   ticker: string
   overall_status: string
   headline: string
@@ -126,6 +126,7 @@ const BANK_NAMES: Record<string, string> = {
   BBNI: "PT Bank Negara Indonesia Tbk",
   BBTN: "PT Bank Tabungan Negara Tbk",
   BDMN: "PT Bank Danamon Indonesia Tbk",
+  BRIS: "PT Bank Syariah Indonesia Tbk",
 }
 
 function resolveCompositeStatus(status: string): "Stabil" | "Waspada" | "Perhatian Khusus" {
@@ -135,7 +136,7 @@ function resolveCompositeStatus(status: string): "Stabil" | "Waspada" | "Perhati
 }
 
 export async function getPrimaryAlert(): Promise<CompositeAlert> {
-  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
   try {
     const res = await fetch(`${baseUrl}/api/v1/composite-alert/summary`, { cache: "no-store" })
     if (res.ok) {
@@ -165,8 +166,49 @@ export async function getPrimaryAlert(): Promise<CompositeAlert> {
   return MOCK_PRIMARY_ALERT
 }
 
+export async function getCompositeAlert(ticker: string): Promise<CompositeAlert> {
+  const upperTicker = ticker.toUpperCase()
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/composite-alert/${upperTicker}`, {
+      cache: "no-store",
+    })
+    if (res.ok) {
+      const top: BackendCompositeAlert = await res.json()
+      if (top && top.ticker) {
+        const zScore = top.foreign_anomaly === "ANOMALI_OUTFLOW" ? -2.8 : top.foreign_anomaly === "ANOMALI_INFLOW" ? 2.45 : 0.0
+        return {
+          id: `alert-${top.ticker.toLowerCase()}-live`,
+          ticker: top.ticker,
+          bankName: BANK_NAMES[top.ticker] || `Bank ${top.ticker} Tbk`,
+          timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
+          timeAgo: "Sesi Terkini",
+          headline: top.headline,
+          summary: top.synthesis_summary,
+          status: resolveCompositeStatus(top.overall_status),
+          zScore,
+          fundamentalScore: Math.round(top.fundamental_score),
+          policyExposure: top.policy_exposure,
+          confidence: 94.2,
+          recommendedAction: top.trigger_factors && top.trigger_factors.length > 0 ? top.trigger_factors.join(" • ") : "Pantau pergerakan harga dan arus volume transaksi",
+        }
+      }
+    }
+  } catch {
+  }
+  if (upperTicker === "BBRI") {
+    return MOCK_PRIMARY_ALERT
+  }
+  return {
+    ...MOCK_PRIMARY_ALERT,
+    id: `alert-${upperTicker.toLowerCase()}-fallback`,
+    ticker: upperTicker,
+    bankName: BANK_NAMES[upperTicker] || `Bank ${upperTicker} Tbk`,
+  }
+}
+
 export async function getAlertFeed(): Promise<AlertFeedItem[]> {
-  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
   try {
     const res = await fetch(`${baseUrl}/api/v1/composite-alert/summary`, { cache: "no-store" })
     if (res.ok) {
@@ -175,8 +217,8 @@ export async function getAlertFeed(): Promise<AlertFeedItem[]> {
         return list.map((item, idx) => {
           const triggerPillars: ("fundamental" | "sentiment" | "foreign_flow")[] = []
           if (item.fundamental_score > 0) triggerPillars.push("fundamental")
-          if (item.foreign_anomaly !== "NORMAL") triggerPillars.push("foreign_flow")
-          if (item.company_sentiment !== 0 || item.policy_exposure !== 0) triggerPillars.push("sentiment")
+          if (item.foreign_anomaly && item.foreign_anomaly !== "NORMAL") triggerPillars.push("foreign_flow")
+          if (item.company_sentiment !== 0 || item.policy_exposure !== 0 || item.crowd_sentiment !== 0 || (item.divergence_status && item.divergence_status !== "NORMAL")) triggerPillars.push("sentiment")
           const zScore = item.foreign_anomaly === "ANOMALI_OUTFLOW" ? -2.8 : item.foreign_anomaly === "ANOMALI_INFLOW" ? 2.45 : 0.0
           return {
             id: `feed-live-${idx + 1}`,

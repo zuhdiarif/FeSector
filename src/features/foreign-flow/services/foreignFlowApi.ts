@@ -412,18 +412,21 @@ function createFallbackForeignFlow(ticker: string): ForeignFlowDetail {
   }
 }
 
-interface BackendDailyFlow {
+export interface BackendDailyFlow {
   id?: number
   ticker: string
   tanggal: string
   net_foreign_inflow: number
 }
 
-interface BackendAnomalyBrokerDetail {
+export interface BackendAnomalyBrokerDetail {
+  id?: number
+  anomaly_id?: number
   kode_broker: string
   nama_broker: string
   kategori: string
   net_value: number
+  created_at?: string
 }
 
 export interface BackendFlowAnomaly {
@@ -434,6 +437,7 @@ export interface BackendFlowAnomaly {
   z_score: number
   status_anomali: string
   broker_details?: BackendAnomalyBrokerDetail[]
+  created_at?: string
 }
 
 export async function getForeignFlowData(ticker: string): Promise<ForeignFlowDetail> {
@@ -456,24 +460,56 @@ export async function getForeignFlowData(ticker: string): Promise<ForeignFlowDet
       const variance = values.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / values.length
       const stdDev = Math.sqrt(variance) || 1
 
-      const latestFlow = flows[0].net_foreign_inflow
-      const latestZScore = stdDev > 0 ? (latestFlow - mean) / stdDev : 0
-      const isAnomaly = Math.abs(latestZScore) >= 2.0
+      const anomalyDateMap = new Map<string, BackendFlowAnomaly>()
+      if (Array.isArray(anomalies)) {
+        for (const a of anomalies) {
+          const dStr = a.tanggal.split("T")[0]
+          anomalyDateMap.set(dStr, a)
+        }
+      }
+
+      const recentAnomaly = Array.isArray(anomalies) && anomalies.length > 0 ? anomalies[0] : null
+      let yesterdayFlow = flows.length > 1 ? flows[1].net_foreign_inflow : flows[0].net_foreign_inflow
+      let yesterdayZScore = stdDev > 0 ? (yesterdayFlow - mean) / stdDev : 0
+      let yesterdayAnomalyStatus = `Normal (${yesterdayZScore >= 0 ? "+" : ""}${yesterdayZScore.toFixed(2)}σ)`
+
+      if (recentAnomaly && Math.abs(recentAnomaly.z_score) >= 2.0) {
+        yesterdayFlow = recentAnomaly.net_foreign_inflow
+        yesterdayZScore = recentAnomaly.z_score
+        yesterdayAnomalyStatus = recentAnomaly.z_score < 0
+          ? `Outflow Ekstrem (${Math.abs(recentAnomaly.z_score).toFixed(1)}x σ normal)`
+          : `Inflow Ekstrem (${recentAnomaly.z_score.toFixed(1)}x σ normal)`
+      } else if (flows.length > 0) {
+        const latestZ = stdDev > 0 ? (flows[0].net_foreign_inflow - mean) / stdDev : 0
+        if (Math.abs(latestZ) >= 2.0) {
+          yesterdayFlow = flows[0].net_foreign_inflow
+          yesterdayZScore = latestZ
+          yesterdayAnomalyStatus = latestZ < 0
+            ? `Outflow Ekstrem (${Math.abs(latestZ).toFixed(1)}x σ normal)`
+            : `Inflow Ekstrem (${latestZ.toFixed(1)}x σ normal)`
+        }
+      }
 
       const flowPoints = flows.slice(0, 30).reverse().map((f) => {
         const d = new Date(f.tanggal)
         const displayDate = !isNaN(d.getTime())
           ? d.toLocaleDateString("id-ID", { day: "2-digit", month: "short" })
           : f.tanggal
+        const pDateStr = f.tanggal.split("T")[0]
+        const matchingAnomaly = anomalyDateMap.get(pDateStr)
         const z = stdDev > 0 ? (f.net_foreign_inflow - mean) / stdDev : 0
-        const isAnom = Math.abs(z) >= 2.0
+        const zScoreVal = matchingAnomaly ? matchingAnomaly.z_score : z
+        const isAnom = matchingAnomaly ? Math.abs(matchingAnomaly.z_score) >= 2.0 : Math.abs(z) >= 2.0
+        const brokerCode = matchingAnomaly?.broker_details?.[0]?.kode_broker
+
         return {
           date: f.tanggal,
           displayDate,
           netFlow: Number((f.net_foreign_inflow / 1000000000).toFixed(1)),
-          zScore: Number(z.toFixed(2)),
+          zScore: Number(zScoreVal.toFixed(2)),
           isAnomaly: isAnom,
-          anomalyType: isAnom ? (z < 0 ? ("outflow" as const) : ("inflow" as const)) : undefined,
+          anomalyType: isAnom ? (zScoreVal < 0 ? ("outflow" as const) : ("inflow" as const)) : undefined,
+          dominantBroker: brokerCode,
         }
       })
 
@@ -504,7 +540,31 @@ export async function getForeignFlowData(ticker: string): Promise<ForeignFlowDet
               isExtreme: Math.abs(a.z_score) >= 2.5,
             }
           })
-        : mockFallback.anomalies14d
+        : []
+
+      let synthesisSentence = mockFallback.synthesisSentence
+      if (recentAnomaly && Math.abs(recentAnomaly.z_score) >= 2.0) {
+        const b = recentAnomaly.broker_details?.[0]
+        const bText = b ? ` (${b.kode_broker}: net-${b.net_value < 0 ? "sell" : "buy"} masif Rp ${(Math.abs(b.net_value) / 1e9).toFixed(1)} miliar)` : ""
+        const dObj = new Date(recentAnomaly.tanggal)
+        const dStr = !isNaN(dObj.getTime())
+          ? dObj.toLocaleDateString("id-ID", { day: "numeric", month: "long" })
+          : recentAnomaly.tanggal
+        synthesisSentence = `Deviasi ${recentAnomaly.z_score >= 0 ? "+" : ""}${recentAnomaly.z_score.toFixed(2)}σ pada ${dStr} mengonfirmasikan aksi ${recentAnomaly.z_score < 0 ? "ambil untung agresif" : "akumulasi agresif"} institusi asing${bText}. Indikator foreign flow 90 hari terpantau aktif.`
+      }
+
+      let composition14d = mockFallback.composition14d
+      if (recentAnomaly && recentAnomaly.broker_details && recentAnomaly.broker_details.length > 0) {
+        const brokerStrs = recentAnomaly.broker_details.map(
+          (b) => `${b.kode_broker} (${b.nama_broker.split(" ")[0]})`
+        )
+        if (brokerStrs.length > 0) {
+          composition14d = {
+            ...composition14d,
+            top3Brokers: brokerStrs,
+          }
+        }
+      }
 
       const totalT = Math.abs(sum) >= 1e12
         ? `${sum >= 0 ? "+" : "-"}Rp ${(Math.abs(sum) / 1e12).toFixed(2)} T`
@@ -513,22 +573,20 @@ export async function getForeignFlowData(ticker: string): Promise<ForeignFlowDet
       return {
         ticker: upper,
         bankName: mockFallback.bankName,
-        yesterdayFlow: latestFlow,
-        yesterdayZScore: Number(latestZScore.toFixed(2)),
-        yesterdayAnomalyStatus: isAnomaly
-          ? latestZScore < 0 ? `Outflow Ekstrem (${Math.abs(latestZScore).toFixed(1)}x σ normal)` : `Inflow Ekstrem (${latestZScore.toFixed(1)}x σ normal)`
-          : `Normal (${latestZScore >= 0 ? "+" : ""}${latestZScore.toFixed(2)}σ)`,
+        yesterdayFlow,
+        yesterdayZScore: Number(yesterdayZScore.toFixed(2)),
+        yesterdayAnomalyStatus,
         baselineMean90d: mean,
         standardDeviation: stdDev,
         totalNetFlow90d: sum,
         totalNetFlowFormatted: totalT,
         anomalyCount90d: anomalies.length || mockFallback.anomalyCount90d,
-        inflowAnomalyCount: anomalies.filter((a) => a.z_score > 0).length || mockFallback.inflowAnomalyCount,
-        outflowAnomalyCount: anomalies.filter((a) => a.z_score < 0).length || mockFallback.outflowAnomalyCount,
-        synthesisSentence: mockFallback.synthesisSentence,
+        inflowAnomalyCount: anomalies.filter((a) => a.z_score > 0).length,
+        outflowAnomalyCount: anomalies.filter((a) => a.z_score < 0).length,
+        synthesisSentence,
         synthesisConfidence: mockFallback.synthesisConfidence,
-        composition14d: mockFallback.composition14d,
-        anomalies14d,
+        composition14d,
+        anomalies14d: anomalies14d.length > 0 ? anomalies14d : mockFallback.anomalies14d,
         flowPoints,
       }
     }
@@ -575,3 +633,18 @@ export async function getForeignFlowSummary(): Promise<BackendFlowAnomaly[]> {
   }
 }
 
+export async function getForeignFlowAnomalies(ticker: string): Promise<BackendFlowAnomaly[]> {
+  const upper = (ticker || "BBRI").toUpperCase()
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/foreign-flow/${upper}/anomalies`, {
+      cache: "no-store",
+    })
+    if (!res.ok) throw new Error("Gagal mengambil anomali broker asing")
+    const list: BackendFlowAnomaly[] = await res.json()
+    return list
+  } catch {
+    const summary = await getForeignFlowSummary()
+    return summary.filter((a) => a.ticker.toUpperCase() === upper)
+  }
+}

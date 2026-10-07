@@ -15,6 +15,7 @@ export interface SentimentArticle {
   reasoning: string
   quote: string
   timeDecayLabel: string
+  ticker?: string
 }
 
 export interface SentimentData {

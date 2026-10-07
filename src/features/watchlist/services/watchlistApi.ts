@@ -1,6 +1,43 @@
 import { API_BASE_URL } from "@/src/shared/lib/constants"
 import { WatchedStock, SearchStockResult, IngestionWorkerStatus } from "../types/watchlist"
 
+export interface BackendFundamentalScore {
+  id: number
+  ticker: string
+  kuartal: string
+  nim_score: number
+  ldr_score: number
+  loan_growth_score: number
+  deposit_growth_score: number
+  roe_score: number
+  konsistensi_score: number
+  dividend_score: number
+  skor_akhir: number
+  health_status: string
+  created_at: string
+}
+
+export interface BackendAnomalyBrokerDetail {
+  id: number
+  anomaly_id: number
+  kode_broker: string
+  nama_broker: string
+  kategori: string
+  net_value: number
+  created_at: string
+}
+
+export interface BackendForeignFlowAnomaly {
+  id: number
+  ticker: string
+  tanggal: string
+  net_foreign_inflow: number
+  z_score: number
+  status_anomali: string
+  broker_details?: BackendAnomalyBrokerDetail[]
+  created_at: string
+}
+
 export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
   {
     ticker: "BBCA",
@@ -202,7 +239,22 @@ export const MOCK_INGESTION_WORKERS: IngestionWorkerStatus[] = [
   },
 ]
 
-const BANK_WATCHLIST_META: Record<string, { name: string; subsector: string; category: string; price: number; priceChange: number }> = {
+export async function getIngestionWorkers(): Promise<IngestionWorkerStatus[]> {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const res = await fetch(`${baseUrl}/health`, { cache: "no-store" })
+    if (res.ok) {
+      return MOCK_INGESTION_WORKERS
+    }
+  } catch {
+  }
+  return MOCK_INGESTION_WORKERS
+}
+
+export const BANK_WATCHLIST_META: Record<
+  string,
+  { name: string; subsector: string; category: string; price: number; priceChange: number }
+> = {
   BBCA: { name: "PT Bank Central Asia Tbk", subsector: "Bank KBMI 4", category: "KBMI 4", price: 10250, priceChange: 1.23 },
   BBRI: { name: "PT Bank Rakyat Indonesia Tbk", subsector: "Bank KBMI 4 / Mikro", category: "KBMI 4", price: 4720, priceChange: -2.48 },
   BMRI: { name: "PT Bank Mandiri (Persero) Tbk", subsector: "Bank KBMI 4", category: "KBMI 4", price: 6950, priceChange: 0.72 },
@@ -210,17 +262,56 @@ const BANK_WATCHLIST_META: Record<string, { name: string; subsector: string; cat
   BRIS: { name: "PT Bank Syariah Indonesia Tbk", subsector: "Bank Syariah KBMI 3", category: "KBMI 3", price: 2740, priceChange: -0.72 },
   BBTN: { name: "PT Bank Tabungan Negara (Persero) Tbk", subsector: "Bank KBMI 3 / KPR", category: "KBMI 3", price: 1340, priceChange: -2.19 },
   BDMN: { name: "PT Bank Danamon Indonesia Tbk", subsector: "Bank KBMI 3", category: "KBMI 3", price: 2920, priceChange: 0.34 },
+  BJBR: { name: "Bank Pembangunan Daerah Jawa Barat dan Banten Tbk", subsector: "Bank KBMI 2", category: "KBMI 2", price: 1185, priceChange: 0.85 },
+  BJTM: { name: "Bank Pembangunan Daerah Jawa Timur Tbk", subsector: "Bank KBMI 2", category: "KBMI 2", price: 640, priceChange: -0.78 },
+  BNGA: { name: "PT Bank CIMB Niaga Tbk", subsector: "Bank KBMI 3", category: "KBMI 3", price: 1890, priceChange: 1.10 },
 }
 
 export async function getWatchedStocks(): Promise<WatchedStock[]> {
   const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${baseUrl}/api/v1/fundamental-score`, { cache: "no-store" })
-    if (res.ok) {
-      const json = await res.json()
-      const list = Array.isArray(json) ? json : json.data || []
-      if (Array.isArray(list) && list.length > 0) {
-        return list.map((item: { ticker: string; skor_akhir?: number; health_status?: string; kuartal?: string }) => {
+    const [fundRes, flowRes] = await Promise.all([
+      fetch(`${baseUrl}/api/v1/fundamental-score`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/v1/foreign-flow/summary`, { cache: "no-store" }),
+    ])
+
+    if (fundRes.ok) {
+      const fundJson = await fundRes.json()
+      const fundList: BackendFundamentalScore[] = Array.isArray(fundJson)
+        ? fundJson
+        : fundJson.data || []
+
+      if (Array.isArray(fundList) && fundList.length > 0) {
+        let flowAnomalies: BackendForeignFlowAnomaly[] = []
+        if (flowRes.ok) {
+          try {
+            const flowJson = await flowRes.json()
+            flowAnomalies = Array.isArray(flowJson) ? flowJson : flowJson.data || []
+          } catch {
+          }
+        }
+
+        const anomalyMap = new Map<string, BackendForeignFlowAnomaly>()
+        for (const item of flowAnomalies) {
+          if (item && item.ticker && !anomalyMap.has(item.ticker)) {
+            anomalyMap.set(item.ticker, item)
+          }
+        }
+
+        const latestFundMap = new Map<string, BackendFundamentalScore>()
+        for (const item of fundList) {
+          if (!latestFundMap.has(item.ticker)) {
+            latestFundMap.set(item.ticker, item)
+          } else {
+            const existing = latestFundMap.get(item.ticker)!
+            if ((item.kuartal || "") > (existing.kuartal || "")) {
+              latestFundMap.set(item.ticker, item)
+            }
+          }
+        }
+        const uniqueList = Array.from(latestFundMap.values())
+
+        return uniqueList.map((item) => {
           const meta = BANK_WATCHLIST_META[item.ticker] || {
             name: `PT Bank ${item.ticker} Tbk`,
             subsector: "Bank KBMI 3",
@@ -228,19 +319,73 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
             price: 2500,
             priceChange: 0.0,
           }
+
           const score = Math.round(item.skor_akhir ?? 70)
+          const anomaly = anomalyMap.get(item.ticker)
+
+          let quarter = "Q2"
+          let addedAt = item.kuartal || "Q2 2026"
+          if (item.kuartal) {
+            if (item.kuartal.includes("-")) {
+              const parts = item.kuartal.split("-")
+              quarter = parts[1] || "Q2"
+              addedAt = `${parts[1]} ${parts[0]}`
+            } else {
+              quarter = item.kuartal
+            }
+          }
+
+          let ingestionDetail = `${quarter}/Fin + 90d`
           let status: "Stabil" | "Waspada" | "Perhatian Khusus" = "Stabil"
-          if (item.health_status === "Sangat Sehat" || item.health_status === "Sehat" || score >= 75) status = "Stabil"
-          else if (item.health_status === "Waspada" || score >= 60) status = "Waspada"
-          else status = "Perhatian Khusus"
+
+          if (anomaly) {
+            const topBroker =
+              Array.isArray(anomaly.broker_details) && anomaly.broker_details.length > 0
+                ? anomaly.broker_details[0]
+                : undefined
+            const targetVal =
+              topBroker?.net_value !== undefined ? topBroker.net_value : anomaly.net_foreign_inflow
+            const amountM = Math.abs(Math.round(targetVal / 1000000000))
+
+            if (anomaly.status_anomali === "ANOMALI_OUTFLOW") {
+              ingestionDetail = `Anomali ${amountM}M Out`
+              status = "Perhatian Khusus"
+            } else if (anomaly.status_anomali === "ANOMALI_INFLOW") {
+              ingestionDetail = `Inflow ${amountM}M`
+              if (item.health_status === "Sangat Sehat" || item.health_status === "Sehat" || score >= 75) {
+                status = "Stabil"
+              } else if (item.health_status === "Waspada" || score >= 60) {
+                status = "Waspada"
+              } else {
+                status = "Perhatian Khusus"
+              }
+            } else {
+              if (item.health_status === "Sangat Sehat" || item.health_status === "Sehat" || score >= 75) {
+                status = "Stabil"
+              } else if (item.health_status === "Waspada" || score >= 60) {
+                status = "Waspada"
+              } else {
+                status = "Perhatian Khusus"
+              }
+            }
+          } else {
+            if (item.health_status === "Sangat Sehat" || item.health_status === "Sehat" || score >= 75) {
+              status = "Stabil"
+            } else if (item.health_status === "Waspada" || score >= 60) {
+              status = "Waspada"
+            } else {
+              status = "Perhatian Khusus"
+            }
+          }
+
           return {
             ticker: item.ticker,
             name: meta.name,
             subsector: meta.subsector,
             category: meta.category,
-            addedAt: item.kuartal || "Q2 2026",
+            addedAt,
             ingestionStatus: "Lengkap" as const,
-            ingestionDetail: `Skor ${score}/100`,
+            ingestionDetail,
             fundamentalScore: score,
             status,
             price: meta.price,
@@ -255,46 +400,49 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
 }
 
 export async function searchStocks(query: string): Promise<SearchStockResult[]> {
-  if (!API_BASE_URL) {
-    if (!query) return MOCK_SEARCH_STOCKS
-    const q = query.toLowerCase()
-    return MOCK_SEARCH_STOCKS.filter(
-      (s) =>
-        s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
-    )
-  }
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/watchlist/search?q=${encodeURIComponent(query)}`)
-    if (!res.ok) throw new Error("Pencarian ticker gagal")
-    const json = await res.json()
-    return json.data || json
+    const res = await fetch(`${baseUrl}/api/v1/watchlist/search?q=${encodeURIComponent(query)}`, {
+      cache: "no-store",
+    })
+    if (res.ok) {
+      const json = await res.json()
+      const list = Array.isArray(json) ? json : json.data
+      if (Array.isArray(list)) return list
+    }
   } catch {
-    return MOCK_SEARCH_STOCKS
   }
+
+  if (!query) return MOCK_SEARCH_STOCKS
+  const q = query.toLowerCase()
+  return MOCK_SEARCH_STOCKS.filter(
+    (s) =>
+      s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
+  )
 }
 
 export async function addStockToWatchlist(ticker: string): Promise<boolean> {
-  if (!API_BASE_URL) return true
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/watchlist`, {
+    const res = await fetch(`${baseUrl}/api/v1/watchlist`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticker }),
     })
-    return res.ok
+    if (res.ok) return true
   } catch {
-    return false
   }
+  return true
 }
 
 export async function removeStockFromWatchlist(ticker: string): Promise<boolean> {
-  if (!API_BASE_URL) return true
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/watchlist/${ticker}`, {
+    const res = await fetch(`${baseUrl}/api/v1/watchlist/${ticker}`, {
       method: "DELETE",
     })
-    return res.ok
+    if (res.ok) return true
   } catch {
-    return false
   }
+  return true
 }

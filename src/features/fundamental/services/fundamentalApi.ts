@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/src/shared/lib/constants"
-import { FundamentalScoreDetail, ScreenerBankItem } from "../types/fundamental"
+import { FundamentalScoreDetail, ScreenerBankItem, FundamentalScoreHistoryItem } from "../types/fundamental"
 
 export const MOCK_FUNDAMENTAL_DETAILS: Record<string, FundamentalScoreDetail> = {
   BBRI: {
@@ -257,7 +257,7 @@ const BANK_METADATA: Record<string, { name: string; category: string }> = {
   BDMN: { name: "Bank Danamon Indonesia Tbk", category: "KBMI 3" },
 }
 
-interface BackendFundamentalScore {
+export interface BackendFundamentalScore {
   id?: number
   ticker: string
   kuartal?: string
@@ -270,11 +270,12 @@ interface BackendFundamentalScore {
   dividend_score?: number
   skor_akhir?: number
   health_status?: string
+  created_at?: string
 }
 
 function resolveStatus(status?: string, score = 70): "Stabil" | "Waspada" | "Perhatian Khusus" {
-  if (status === "Sangat Sehat" || status === "Sehat" || score >= 75) return "Stabil"
-  if (status === "Waspada" || score >= 60) return "Waspada"
+  if (status === "Sangat Sehat" || status === "Sehat" || score >= 70) return "Stabil"
+  if (status === "Cukup" || status === "Waspada" || score >= 50) return "Waspada"
   return "Perhatian Khusus"
 }
 
@@ -303,6 +304,7 @@ export async function getFundamentalScore(ticker: string): Promise<FundamentalSc
           quarter: data.kuartal || fallback.quarter,
           score,
           status,
+          percentile: `Top ${Math.max(1, Math.min(99, 100 - score))}%`,
           nimScore,
           ldrScore,
           loanGrowthScore,
@@ -311,13 +313,13 @@ export async function getFundamentalScore(ticker: string): Promise<FundamentalSc
           profitConsistencyScore,
           dividendScore,
           dimensions: [
-            { key: "nim", name: "Margin Bunga Bersih (NIM)", score: nimScore, weight: 20, rawValue: fallback.financialMetrics.nim, percentileRank: nimScore, evaluation: nimScore >= 80 ? "Kuat" : "Baik" },
-            { key: "ldr", name: "Rasio Kredit-Simpanan (LDR)", score: ldrScore, weight: 15, rawValue: fallback.financialMetrics.ldr, evaluation: ldrScore >= 80 ? "Optimal (Sweet-spot)" : "Sehat" },
-            { key: "loanGrowth", name: "Pertumbuhan Kredit YoY", score: loanGrowthScore, weight: 15, rawValue: fallback.financialMetrics.loanGrowthYoY, percentileRank: loanGrowthScore, evaluation: loanGrowthScore >= 75 ? "Kuat" : "Sehat" },
-            { key: "depositGrowth", name: "Pertumbuhan Simpanan YoY", score: depositGrowthScore, weight: 10, rawValue: fallback.financialMetrics.depositGrowthYoY, percentileRank: depositGrowthScore, evaluation: "Cukup" },
-            { key: "roe", name: "Return on Equity (ROE)", score: roeScore, weight: 15, rawValue: fallback.financialMetrics.roe, percentileRank: roeScore, evaluation: roeScore >= 85 ? "Sangat Kuat" : "Kuat" },
-            { key: "profitConsistency", name: "Konsistensi Laba", score: profitConsistencyScore, weight: 15, rawValue: fallback.dimensions.find((d) => d.key === "profitConsistency")?.rawValue || "7/8 Kuartal", evaluation: "Konsisten" },
-            { key: "dividend", name: "Keandalan Dividen", score: dividendScore, weight: 10, rawValue: fallback.dimensions.find((d) => d.key === "dividend")?.rawValue || "4.5%", percentileRank: dividendScore, evaluation: dividendScore >= 75 ? "Tinggi" : "Baik" },
+            { key: "nim", name: "Margin Bunga Bersih (NIM)", score: nimScore, weight: 20, rawValue: fallback.financialMetrics.nim, percentileRank: nimScore, evaluation: nimScore >= 80 ? "Kuat" : nimScore >= 60 ? "Baik" : "Rendah" },
+            { key: "ldr", name: "Rasio Kredit-Simpanan (LDR)", score: ldrScore, weight: 15, rawValue: fallback.financialMetrics.ldr, evaluation: ldrScore >= 80 ? "Optimal (Sweet-spot)" : ldrScore >= 60 ? "Sehat" : "Waspada Likuiditas" },
+            { key: "loanGrowth", name: "Pertumbuhan Kredit YoY", score: loanGrowthScore, weight: 15, rawValue: fallback.financialMetrics.loanGrowthYoY, percentileRank: loanGrowthScore, evaluation: loanGrowthScore >= 75 ? "Kuat" : loanGrowthScore >= 50 ? "Sehat" : "Moderat" },
+            { key: "depositGrowth", name: "Pertumbuhan Simpanan YoY", score: depositGrowthScore, weight: 10, rawValue: fallback.financialMetrics.depositGrowthYoY, percentileRank: depositGrowthScore, evaluation: depositGrowthScore >= 75 ? "Kuat" : "Cukup" },
+            { key: "roe", name: "Return on Equity (ROE)", score: roeScore, weight: 15, rawValue: fallback.financialMetrics.roe, percentileRank: roeScore, evaluation: roeScore >= 85 ? "Sangat Kuat" : roeScore >= 70 ? "Kuat" : "Moderat" },
+            { key: "profitConsistency", name: "Konsistensi Laba", score: profitConsistencyScore, weight: 15, rawValue: fallback.dimensions.find((d) => d.key === "profitConsistency")?.rawValue || "7/8 Kuartal", evaluation: profitConsistencyScore >= 80 ? "Konsisten" : "Cukup" },
+            { key: "dividend", name: "Keandalan Dividen", score: dividendScore, weight: 10, rawValue: fallback.dimensions.find((d) => d.key === "dividend")?.rawValue || "4.5%", percentileRank: dividendScore, evaluation: dividendScore >= 75 ? "Tinggi" : dividendScore >= 55 ? "Baik" : "Moderat" },
           ],
         }
       }
@@ -349,6 +351,7 @@ export async function getScreenerData(): Promise<ScreenerBankItem[]> {
             roe: Math.round(item.roe_score ?? 70),
             dividend: Math.round(item.dividend_score ?? 70),
             status: resolveStatus(item.health_status, score),
+            quarter: item.kuartal,
           }
         })
       }
@@ -356,4 +359,53 @@ export async function getScreenerData(): Promise<ScreenerBankItem[]> {
   } catch {
   }
   return MOCK_SCREENER_DATA
+}
+
+export async function getFundamentalHistory(ticker: string): Promise<FundamentalScoreHistoryItem[]> {
+  const upper = (ticker || "BBRI").toUpperCase()
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/fundamental-score/${upper}/history`, { cache: "no-store" })
+    if (res.ok) {
+      const json = await res.json()
+      const list: BackendFundamentalScore[] = Array.isArray(json) ? json : json.data || []
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((item) => {
+          const score = Math.round(item.skor_akhir ?? 70)
+          return {
+            id: item.id,
+            ticker: item.ticker,
+            quarter: item.kuartal || "Q2 2026",
+            score,
+            status: resolveStatus(item.health_status, score),
+            nimScore: Math.round(item.nim_score ?? 70),
+            ldrScore: Math.round(item.ldr_score ?? 70),
+            loanGrowthScore: Math.round(item.loan_growth_score ?? 70),
+            depositGrowthScore: Math.round(item.deposit_growth_score ?? 70),
+            roeScore: Math.round(item.roe_score ?? 70),
+            profitConsistencyScore: Math.round(item.konsistensi_score ?? 70),
+            dividendScore: Math.round(item.dividend_score ?? 70),
+            createdAt: item.created_at,
+          }
+        })
+      }
+    }
+  } catch {
+  }
+  const fallback = MOCK_FUNDAMENTAL_DETAILS[upper] || createFallbackFundamental(upper)
+  return [
+    {
+      ticker: upper,
+      quarter: fallback.quarter,
+      score: fallback.score,
+      status: fallback.status as "Stabil" | "Waspada" | "Perhatian Khusus",
+      nimScore: fallback.nimScore,
+      ldrScore: fallback.ldrScore,
+      loanGrowthScore: fallback.loanGrowthScore,
+      depositGrowthScore: fallback.depositGrowthScore,
+      roeScore: fallback.roeScore,
+      profitConsistencyScore: fallback.profitConsistencyScore,
+      dividendScore: fallback.dividendScore,
+    },
+  ]
 }

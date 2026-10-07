@@ -1,7 +1,7 @@
 import React from "react"
 import { Metadata } from "next"
 import Link from "next/link"
-import { getSectorOverview, getSectorNews } from "@/src/features/sectors"
+import { getSectorOverview, getSectorNews, getSectorMovers } from "@/src/features/sectors"
 
 interface SectorDetailPageProps {
   params: Promise<{ slug: string }>
@@ -24,11 +24,13 @@ export default async function SectorDetailPage({
   const { slug } = await params
   const { sub_sector } = await searchParams
 
-  const [overview, news] = await Promise.all([
+  const [overview, news, movers] = await Promise.all([
     getSectorOverview(slug),
     getSectorNews(slug, sub_sector || undefined),
+    getSectorMovers(slug),
   ])
 
+  const topMovers = movers && movers.length > 0 ? movers : overview.top_movers
   const flowMiliar = Math.round(overview.net_foreign_flow / 1000000000)
 
   return (
@@ -133,7 +135,7 @@ export default async function SectorDetailPage({
             Top Movers & Konstituen Penggerak
           </span>
           <div className="flex flex-wrap gap-2">
-            {overview.top_movers.map((mover) => (
+            {topMovers.map((mover) => (
               <span
                 key={mover}
                 className="px-3 py-1 bg-surface-container-lowest rounded-lg border border-border-subtle text-caption font-mono font-bold text-text-primary"

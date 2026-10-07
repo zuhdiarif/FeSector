@@ -97,7 +97,7 @@ export default async function ComparePage() {
               <span className="font-label-ticker text-headline-sm font-bold text-data-bullish">
                 BBCA — Keunggulan Kualitas (Premium Defensive)
               </span>
-              <span className="font-mono text-tabular-lg font-bold text-text-primary">84</span>
+              <span className="font-mono text-tabular-lg font-bold text-text-primary">{bbcaFund.score}</span>
             </div>
             <p className="font-body-sm text-body-sm text-text-secondary leading-relaxed">
               Memimpin likuiditas ROE (22,4%), Low Growth (14,3%) dan rekor CASA (82,4%). Arus broker asing net-inflow terbesar.
@@ -109,7 +109,7 @@ export default async function ComparePage() {
               <span className="font-label-ticker text-headline-sm font-bold text-data-neutral">
                 BMRI — Pertumbuhan Dana Murah Tercepat
               </span>
-              <span className="font-mono text-tabular-lg font-bold text-text-primary">79</span>
+              <span className="font-mono text-tabular-lg font-bold text-text-primary">{bmriFund.score}</span>
             </div>
             <p className="font-body-sm text-body-sm text-text-secondary leading-relaxed">
               Valuasi PBV paling terdiskon (1,8x) di antara Big-3 dengan pertumbuhan deposit tertinggi (+10,6% YoY) berkat penetrasi Livin.
@@ -121,12 +121,13 @@ export default async function ComparePage() {
               <span className="font-label-ticker text-headline-sm font-bold text-brand-red">
                 BBRI — Tekanan Outflow & High Yield
               </span>
-              <span className="font-mono text-tabular-lg font-bold text-text-primary">71</span>
+              <span className="font-mono text-tabular-lg font-bold text-text-primary">{bbriFund.score}</span>
             </div>
             <p className="font-body-sm text-body-sm text-text-secondary leading-relaxed">
               NIM tertinggi (6,02%) & dividend yield (6,45%), namun tertekan oleh anomali outflow broker asing (-2.80σ) akibat kekhawatiran kredit mikro.
             </p>
           </div>
+
         </div>
       </div>
 

@@ -4,6 +4,8 @@ import Link from "next/link"
 import { StockCard } from "@/src/entities/stock"
 import { CompositeAlertHero, getPrimaryAlert, getAlertFeed } from "@/src/features/composite-alert"
 import { getWatchedStocks } from "@/src/features/watchlist"
+import { getForeignFlowSummary } from "@/src/features/foreign-flow"
+import { getArticlesFeed } from "@/src/features/sentiment"
 
 export const metadata: Metadata = {
   title: "Dashboard Utama",
@@ -11,11 +13,47 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const [primaryAlert, stocks, feedItems] = await Promise.all([
+  const [primaryAlert, stocks, feedItems, flowAnomalies, liveArticles] = await Promise.all([
     getPrimaryAlert(),
     getWatchedStocks(),
     getAlertFeed(),
+    getForeignFlowSummary(),
+    getArticlesFeed("BBRI"),
   ])
+
+  const anomalyCount = flowAnomalies.filter((a) => Math.abs(a.z_score) >= 2.0).length || 1
+  const topAnomaly = flowAnomalies.find((a) => Math.abs(a.z_score) >= 2.0)
+  const anomalyHeadline = topAnomaly
+    ? `${anomalyCount} Anomali Masif (${topAnomaly.ticker}: ${topAnomaly.z_score.toFixed(1)}σ)`
+    : "Kondisi Aliran Normal"
+
+  const activityRows = ["BBCA", "BBRI", "BMRI", "BBNI"].map((ticker) => {
+    const anom = flowAnomalies.find((a) => a.ticker === ticker)
+    const alert = feedItems.find((f) => f.ticker === ticker)
+    const dominantBroker = anom?.broker_details?.[0]
+      ? `${anom.broker_details[0].kode_broker} (${anom.broker_details[0].nama_broker})`
+      : ticker === "BBCA"
+      ? "ZP (Maybank Kim Eng)"
+      : ticker === "BMRI"
+      ? "AK (UBS Sekuritas)"
+      : "BK (J.P. Morgan)"
+    const net1dValue = anom ? anom.net_foreign_inflow : ticker === "BBCA" ? 142000000000 : ticker === "BMRI" ? 41000000000 : 18000000000
+    const net5dValue = anom ? anom.net_foreign_inflow * 3.5 : ticker === "BBCA" ? 510000000000 : ticker === "BMRI" ? 205000000000 : 48000000000
+    const zScore = anom ? anom.z_score : alert?.zScore ?? (ticker === "BBCA" ? 1.1 : ticker === "BMRI" ? 0.4 : 0.1)
+    const isOutflowAnomaly = zScore <= -2.0
+    const isInflowAnomaly = zScore >= 2.0
+    const statusText = isOutflowAnomaly ? "Anomali Outflow" : isInflowAnomaly ? "Anomali Inflow" : zScore > 0 ? "Normal Buy" : "Netral"
+    return {
+      ticker,
+      net1d: `${net1dValue >= 0 ? "+" : "-"}Rp ${(Math.abs(net1dValue) / 1e9).toFixed(0)} M`,
+      net5d: `${net5dValue >= 0 ? "+" : "-"}Rp ${(Math.abs(net5dValue) / 1e9).toFixed(0)} M`,
+      zScore: `${zScore >= 0 ? "+" : ""}${zScore.toFixed(1)}σ`,
+      broker: dominantBroker,
+      status: statusText,
+      isAlert: isOutflowAnomaly,
+      isPositive: net1dValue >= 0,
+    }
+  })
 
   const enrichedStocks = stocks.map((s) => {
     const alert = feedItems.find((f) => f.ticker === s.ticker)
@@ -126,7 +164,7 @@ export default async function DashboardPage() {
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-brand-red/15 text-brand-red border border-brand-red/30">
               <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />
               <span className="font-caption text-[11px] font-semibold">
-                1 Anomali Masif (BBRI: -2.8σ)
+                {anomalyHeadline}
               </span>
             </div>
           </div>
@@ -212,101 +250,46 @@ export default async function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle/50">
-                <tr className="h-10 hover:bg-surface-container-high transition-colors">
-                  <td className="px-space-sm font-label-ticker font-semibold text-text-primary">
-                    BBCA
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-data-bullish font-bold">
-                    +Rp 142 M
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-data-bullish">
-                    +Rp 510 M
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-text-primary">
-                    +1.1σ
-                  </td>
-                  <td className="px-space-sm text-text-secondary">
-                    <span className="font-mono text-tabular-sm text-text-primary font-medium">ZP</span> (Maybank Kim Eng)
-                  </td>
-                  <td className="px-space-sm text-center">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-data-bullish/10 text-data-bullish font-caption text-[11px] font-medium">
-                      Normal Buy
-                    </span>
-                  </td>
-                </tr>
-
-                <tr className="h-11 bg-brand-red-soft/30 hover:bg-brand-red-soft/50 transition-colors">
-                  <td className="px-space-sm font-label-ticker font-bold text-brand-red flex items-center gap-1 pt-2.5">
-                    <span>BBRI</span>
-                    <span className="material-symbols-outlined text-[14px]">warning</span>
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-data-bearish font-bold">
-                    -Rp 89 M
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-data-bearish">
-                    -Rp 420 M
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-data-bearish font-bold">
-                    -2.8σ
-                  </td>
-                  <td className="px-space-sm text-text-secondary">
-                    <span className="font-mono text-tabular-sm text-data-bearish font-bold">CS</span> (Credit Suisse)
-                  </td>
-                  <td className="px-space-sm text-center">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-data-bearish/20 text-data-bearish font-caption text-[11px] font-bold border border-data-bearish/30">
-                      Anomali Outflow
-                    </span>
-                  </td>
-                </tr>
-
-                <tr className="h-10 hover:bg-surface-container-high transition-colors">
-                  <td className="px-space-sm font-label-ticker font-semibold text-text-primary">
-                    BMRI
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-data-bullish font-bold">
-                    +Rp 41 M
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-data-bullish">
-                    +Rp 205 M
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-text-primary">
-                    +0.4σ
-                  </td>
-                  <td className="px-space-sm text-text-secondary">
-                    <span className="font-mono text-tabular-sm text-text-primary font-medium">AK</span> (UBS Sekuritas)
-                  </td>
-                  <td className="px-space-sm text-center">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-data-bullish/10 text-data-bullish font-caption text-[11px] font-medium">
-                      Normal Buy
-                    </span>
-                  </td>
-                </tr>
-
-                <tr className="h-10 hover:bg-surface-container-high transition-colors">
-                  <td className="px-space-sm font-label-ticker font-semibold text-text-primary">
-                    BBNI
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-data-bullish">
-                    +Rp 18 M
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-text-secondary">
-                    +Rp 48 M
-                  </td>
-                  <td className="px-space-sm text-right font-mono text-tabular-md text-text-primary">
-                    +0.1σ
-                  </td>
-                  <td className="px-space-sm text-text-secondary">
-                    <span className="font-mono text-tabular-sm text-text-primary font-medium">BK</span> (J.P. Morgan)
-                  </td>
-                  <td className="px-space-sm text-center">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-container-high text-text-secondary font-caption text-[11px]">
-                      Netral
-                    </span>
-                  </td>
-                </tr>
+                {activityRows.map((row) => (
+                  <tr
+                    key={row.ticker}
+                    className={`h-10 hover:bg-surface-container-high transition-colors ${
+                      row.isAlert ? "bg-brand-red-soft/30 hover:bg-brand-red-soft/50" : ""
+                    }`}
+                  >
+                    <td className={`px-space-sm font-label-ticker font-semibold ${row.isAlert ? "text-brand-red font-bold flex items-center gap-1 pt-2.5" : "text-text-primary"}`}>
+                      <span>{row.ticker}</span>
+                      {row.isAlert && <span className="material-symbols-outlined text-[14px]">warning</span>}
+                    </td>
+                    <td className={`px-space-sm text-right font-mono text-tabular-md font-bold ${row.isPositive ? "text-data-bullish" : "text-data-bearish"}`}>
+                      {row.net1d}
+                    </td>
+                    <td className={`px-space-sm text-right font-mono text-tabular-md ${row.isPositive ? "text-data-bullish" : "text-data-bearish"}`}>
+                      {row.net5d}
+                    </td>
+                    <td className={`px-space-sm text-right font-mono text-tabular-md font-bold ${row.isAlert ? "text-data-bearish" : "text-text-primary"}`}>
+                      {row.zScore}
+                    </td>
+                    <td className="px-space-sm text-text-secondary">
+                      <span className={`font-mono text-tabular-sm font-medium ${row.isAlert ? "text-data-bearish font-bold" : "text-text-primary"}`}>{row.broker.split(" ")[0]}</span> {row.broker.substring(row.broker.indexOf(" "))}
+                    </td>
+                    <td className="px-space-sm text-center">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-caption text-[11px] font-medium ${
+                        row.isAlert
+                          ? "bg-data-bearish/20 text-data-bearish font-bold border border-data-bearish/30"
+                          : row.isPositive
+                          ? "bg-data-bullish/10 text-data-bullish"
+                          : "bg-surface-container-high text-text-secondary"
+                      }`}>
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
+
 
           <div className="mt-space-md pt-space-xs flex items-center justify-between text-text-secondary font-caption text-caption border-t border-border-subtle/40">
             <span>Ambang batas anomali diset otomatis pada |Z| &gt; 2.0σ</span>
@@ -332,7 +315,7 @@ export default async function DashboardPage() {
                 </h3>
               </div>
               <span className="px-2 py-0.5 rounded bg-data-neutral/15 text-data-neutral font-caption text-[11px] font-semibold border border-data-neutral/30">
-                Netral-Negatif
+                {primaryAlert.policyExposure <= -0.1 ? "Netral-Negatif" : primaryAlert.policyExposure >= 0.1 ? "Positif" : "Netral"}
               </span>
             </div>
 
@@ -343,10 +326,10 @@ export default async function DashboardPage() {
                 </span>
                 <div className="flex items-baseline gap-1 mt-0.5">
                   <span className="font-mono text-tabular-lg font-bold text-data-neutral">
-                    -0.15
+                    {primaryAlert.policyExposure >= 0 ? "+" : ""}{primaryAlert.policyExposure.toFixed(2)}
                   </span>
                   <span className="font-caption text-caption text-data-neutral font-medium">
-                    Waspada
+                    {primaryAlert.policyExposure <= -0.2 ? "Waspada Tinggi" : primaryAlert.policyExposure <= -0.1 ? "Waspada" : "Stabil"}
                   </span>
                 </div>
               </div>
@@ -381,71 +364,41 @@ export default async function DashboardPage() {
             </div>
 
             <div className="flex flex-col gap-space-sm divide-y divide-border-subtle/40">
-              <div className="flex flex-col gap-1 pt-space-xs first:pt-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.2 rounded bg-data-bearish/15 text-data-bearish font-caption text-[10px] font-bold">
-                      BEARISH
-                    </span>
-                    <span className="font-label-ticker text-[11px] font-bold text-text-primary">
-                      BBRI
-                    </span>
+              {liveArticles.slice(0, 3).map((art, idx) => {
+                const isBullish = art.sentimentScore >= 0.2
+                const isBearish = art.sentimentScore <= -0.2
+                const tag = isBullish ? "BULLISH" : isBearish ? "BEARISH" : "NETRAL"
+                const tagColor = isBullish
+                  ? "bg-data-bullish/15 text-data-bullish"
+                  : isBearish
+                  ? "bg-data-bearish/15 text-data-bearish"
+                  : "bg-surface-container-high text-text-secondary"
+                const tickerCode = art.affectedEntities || "BBRI"
+                return (
+                  <div key={art.id || idx} className="flex flex-col gap-1 pt-space-xs first:pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-1.5 py-0.2 rounded font-caption text-[10px] font-bold ${tagColor}`}>
+                          {tag}
+                        </span>
+                        <span className="font-label-ticker text-[11px] font-bold text-text-primary">
+                          {tickerCode}
+                        </span>
+                      </div>
+                      <span className="font-mono text-[11px] text-text-secondary">
+                        {art.timeDecayLabel || art.source}
+                      </span>
+                    </div>
+                    <Link
+                      href={`/articles/${tickerCode}`}
+                      className="font-body-sm text-[13px] text-text-primary font-medium hover:text-brand-red transition-colors line-clamp-2"
+                    >
+                      {art.title}
+                    </Link>
                   </div>
-                  <span className="font-mono text-[11px] text-text-secondary">
-                    15:42 WIB • Kontan
-                  </span>
-                </div>
-                <Link
-                  href="/articles/BBRI"
-                  className="font-body-sm text-[13px] text-text-primary font-medium hover:text-brand-red transition-colors line-clamp-2"
-                >
-                  OJK Evaluasi Penyaluran Kredit Sektor Usaha Mikro Akibat Kenaikan NPL Non-Performing Loan ke Level 3,1%.
-                </Link>
-              </div>
+                )
+              })}
 
-              <div className="flex flex-col gap-1 pt-space-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.2 rounded bg-data-bullish/15 text-data-bullish font-caption text-[10px] font-bold">
-                      BULLISH
-                    </span>
-                    <span className="font-label-ticker text-[11px] font-bold text-text-primary">
-                      BBCA
-                    </span>
-                  </div>
-                  <span className="font-mono text-[11px] text-text-secondary">
-                    14:15 WIB • Bisnis.com
-                  </span>
-                </div>
-                <Link
-                  href="/articles/BBCA"
-                  className="font-body-sm text-[13px] text-text-primary font-medium hover:text-brand-red transition-colors line-clamp-2"
-                >
-                  Rasio CASA Sentuh Rekor 82,4%, Beban Dana Bunga Terjaga Efisien Sepanjang Kuartal Berjalan.
-                </Link>
-              </div>
-
-              <div className="flex flex-col gap-1 pt-space-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.2 rounded bg-surface-container-high text-text-secondary font-caption text-[10px] font-bold">
-                      NETRAL
-                    </span>
-                    <span className="font-label-ticker text-[11px] font-bold text-text-primary">
-                      BMRI
-                    </span>
-                  </div>
-                  <span className="font-mono text-[11px] text-text-secondary">
-                    12:30 WIB • CNBC Indonesia
-                  </span>
-                </div>
-                <Link
-                  href="/articles/BMRI"
-                  className="font-body-sm text-[13px] text-text-primary font-medium hover:text-brand-red transition-colors line-clamp-2"
-                >
-                  Ekspansi Kredit Korporasi Melaju Sesuai Target RBB 2026, Pertumbuhan Laba Diproyeksi Stabil 11% YoY.
-                </Link>
-              </div>
             </div>
 
             <div className="mt-space-md pt-space-sm border-t border-border-subtle/50">
@@ -453,11 +406,12 @@ export default async function DashboardPage() {
                 href="/signals"
                 className="text-brand-red hover:underline text-body-sm font-semibold flex items-center justify-center gap-1"
               >
-                <span>Buka Seluruh Feed Berita (42 Sinyal)</span>
+                <span>Buka Seluruh Feed Berita ({feedItems.length} Sinyal)</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </Link>
             </div>
           </div>
+
         </div>
       </div>
     </div>

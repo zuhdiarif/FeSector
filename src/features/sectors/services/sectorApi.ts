@@ -149,6 +149,29 @@ export const MOCK_SECTORS: SectorItem[] = [
   },
 ]
 
+export interface SectorMoversResponse {
+  sector_slug: string
+  top_movers: string[]
+}
+
+export async function getSectors(): Promise<SectorItem[]> {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/sectors`, {
+      cache: "no-store",
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const list = Array.isArray(data) ? data : data.sectors
+      if (Array.isArray(list) && list.length > 0) return list
+    }
+  } catch {
+  }
+  return MOCK_SECTORS
+}
+
+export const getAllSectors = getSectors
+
 export async function getSectorRanking(): Promise<SectorItem[]> {
   const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
@@ -157,7 +180,8 @@ export async function getSectorRanking(): Promise<SectorItem[]> {
     })
     if (res.ok) {
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) return data
+      const list = Array.isArray(data) ? data : data.sectors
+      if (Array.isArray(list) && list.length > 0) return list
     }
   } catch {
   }
@@ -168,7 +192,7 @@ export async function getSectorOverview(slug: string): Promise<SectorOverview> {
   const lowerSlug = slug.toLowerCase()
   const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${baseUrl}/api/v1/sectors/${lowerSlug}/overview`, {
+    const res = await fetch(`${baseUrl}/api/v1/sectors/${lowerSlug}`, {
       cache: "no-store",
     })
     if (res.ok) {
@@ -193,6 +217,24 @@ export async function getSectorOverview(slug: string): Promise<SectorOverview> {
         : "Sentimen makroekonomi domestik dan rotasi aliran modal institusional.",
     history_30d: history,
   }
+}
+
+export async function getSectorMovers(slug: string): Promise<string[]> {
+  const lowerSlug = slug.toLowerCase()
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/sectors/${lowerSlug}/movers`, {
+      cache: "no-store",
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.top_movers)) return data.top_movers
+    }
+  } catch {
+  }
+
+  const found = MOCK_SECTORS.find((s) => s.sector_slug === lowerSlug)
+  return found ? found.top_movers : []
 }
 
 export async function getSectorNews(
@@ -240,7 +282,8 @@ export async function getSectorAlerts(): Promise<SectorRotationAlert[]> {
     })
     if (res.ok) {
       const data = await res.json()
-      if (Array.isArray(data.alerts)) return data.alerts
+      const list = Array.isArray(data) ? data : data.alerts
+      if (Array.isArray(list) && list.length > 0) return list
     }
   } catch {
   }
@@ -267,4 +310,3 @@ export async function getSectorAlerts(): Promise<SectorRotationAlert[]> {
     },
   ]
 }
-

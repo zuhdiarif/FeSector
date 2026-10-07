@@ -130,25 +130,27 @@ export const MOCK_GLOSSARY: GlossaryItem[] = [
 
 export async function getBeginnerBrief(ticker: string): Promise<BeginnerBrief> {
   const upperTicker = ticker.toUpperCase()
-  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
   try {
     const res = await fetch(`${baseUrl}/api/v1/stocks/${upperTicker}/beginner-brief`, {
       cache: "no-store",
     })
     if (res.ok) {
       const data = await res.json()
-      return {
-        ticker: data.ticker || upperTicker,
-        company_name: data.company_name || `PT ${upperTicker} Tbk`,
-        health_badge: data.health_badge || "Sehat",
-        health_color: data.health_color || "green",
-        health_score: data.health_score || 80,
-        tldr_summary: data.tldr_summary || "",
-        pros: Array.isArray(data.pros) ? data.pros : [],
-        cons: Array.isArray(data.cons) ? data.cons : [],
-        investor_fit: Array.isArray(data.investor_fit) ? data.investor_fit : [],
-        faq_items: Array.isArray(data.faq_items) ? data.faq_items : [],
-        last_updated: data.last_updated || new Date().toISOString(),
+      if (data && data.ticker) {
+        return {
+          ticker: data.ticker || upperTicker,
+          company_name: data.company_name || `PT ${upperTicker} Tbk`,
+          health_badge: data.health_badge || "Sehat",
+          health_color: data.health_color || "green",
+          health_score: data.health_score || 80,
+          tldr_summary: data.tldr_summary || "",
+          pros: Array.isArray(data.pros) ? data.pros : [],
+          cons: Array.isArray(data.cons) ? data.cons : [],
+          investor_fit: Array.isArray(data.investor_fit) ? data.investor_fit : [],
+          faq_items: Array.isArray(data.faq_items) ? data.faq_items : [],
+          last_updated: data.last_updated || new Date().toISOString(),
+        }
       }
     }
   } catch {
@@ -194,7 +196,7 @@ export async function getBeginnerBrief(ticker: string): Promise<BeginnerBrief> {
 }
 
 export async function getGlossary(): Promise<GlossaryItem[]> {
-  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
   try {
     const res = await fetch(`${baseUrl}/api/v1/glossary`, {
       cache: "no-store",
@@ -209,4 +211,3 @@ export async function getGlossary(): Promise<GlossaryItem[]> {
   }
   return MOCK_GLOSSARY
 }
-
