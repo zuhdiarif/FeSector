@@ -48,10 +48,12 @@ export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
     addedAt: "14 Jan 2026",
     ingestionStatus: "Lengkap",
     ingestionDetail: "Q2/Fin + 90d",
-    fundamentalScore: 84,
+    fundamentalScore: 89,
+    nimScore: 89,
     status: "Stabil",
     price: 10250,
     priceChange: 1.23,
+    analystCoverage: 28,
   },
   {
     ticker: "BBRI",
@@ -61,10 +63,12 @@ export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
     addedAt: "14 Jan 2026",
     ingestionStatus: "Lengkap",
     ingestionDetail: "Anomali 89M Out",
-    fundamentalScore: 71,
+    fundamentalScore: 87,
+    nimScore: 92,
     status: "Perhatian Khusus",
     price: 4720,
     priceChange: -2.48,
+    analystCoverage: 28,
   },
   {
     ticker: "BMRI",
@@ -74,10 +78,12 @@ export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
     addedAt: "14 Jan 2026",
     ingestionStatus: "Lengkap",
     ingestionDetail: "Inflow 41M",
-    fundamentalScore: 79,
+    fundamentalScore: 85,
+    nimScore: 85,
     status: "Stabil",
     price: 6950,
     priceChange: 0.72,
+    analystCoverage: 28,
   },
   {
     ticker: "BBNI",
@@ -87,10 +93,12 @@ export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
     addedAt: "14 Jan 2026",
     ingestionStatus: "Lengkap",
     ingestionDetail: "Inflow 18M",
-    fundamentalScore: 75,
+    fundamentalScore: 80,
+    nimScore: 76,
     status: "Stabil",
     price: 5425,
     priceChange: 0.46,
+    analystCoverage: 28,
   },
   {
     ticker: "BRIS",
@@ -100,10 +108,42 @@ export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
     addedAt: "20 Jan 2026",
     ingestionStatus: "Lengkap",
     ingestionDetail: "Q2/Fin + 90d",
-    fundamentalScore: 68,
+    fundamentalScore: 75,
+    nimScore: 50,
     status: "Stabil",
     price: 2740,
     priceChange: -0.72,
+    analystCoverage: 18,
+  },
+  {
+    ticker: "BNGA",
+    name: "PT Bank CIMB Niaga Tbk",
+    subsector: "Bank KBMI 3",
+    category: "KBMI 3",
+    addedAt: "24 Jan 2026",
+    ingestionStatus: "Lengkap",
+    ingestionDetail: "Q2/Fin + 90d",
+    fundamentalScore: 75,
+    nimScore: 74,
+    status: "Stabil",
+    price: 1890,
+    priceChange: 1.10,
+    analystCoverage: 12,
+  },
+  {
+    ticker: "BDMN",
+    name: "PT Bank Danamon Indonesia Tbk",
+    subsector: "Bank KBMI 3",
+    category: "KBMI 3",
+    addedAt: "24 Jan 2026",
+    ingestionStatus: "Lengkap",
+    ingestionDetail: "Q2/Fin + 90d",
+    fundamentalScore: 70,
+    nimScore: 70,
+    status: "Stabil",
+    price: 2920,
+    priceChange: 0.34,
+    analystCoverage: 14,
   },
   {
     ticker: "BBTN",
@@ -113,10 +153,42 @@ export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
     addedAt: "22 Jan 2026",
     ingestionStatus: "Lengkap",
     ingestionDetail: "Outflow 24M",
-    fundamentalScore: 58,
+    fundamentalScore: 57,
+    nimScore: 52,
     status: "Perhatian Khusus",
     price: 1340,
     priceChange: -2.19,
+    analystCoverage: 16,
+  },
+  {
+    ticker: "BJBR",
+    name: "Bank Pembangunan Daerah Jawa Barat dan Banten Tbk",
+    subsector: "Bank KBMI 2",
+    category: "KBMI 2",
+    addedAt: "25 Jan 2026",
+    ingestionStatus: "Lengkap",
+    ingestionDetail: "Q2/Fin + 90d",
+    fundamentalScore: 75,
+    nimScore: 72,
+    status: "Stabil",
+    price: 1185,
+    priceChange: 0.85,
+    analystCoverage: 10,
+  },
+  {
+    ticker: "BJTM",
+    name: "Bank Pembangunan Daerah Jawa Timur Tbk",
+    subsector: "Bank KBMI 2",
+    category: "KBMI 2",
+    addedAt: "25 Jan 2026",
+    ingestionStatus: "Lengkap",
+    ingestionDetail: "Q2/Fin + 90d",
+    fundamentalScore: 75,
+    nimScore: 71,
+    status: "Stabil",
+    price: 640,
+    priceChange: -0.78,
+    analystCoverage: 8,
   },
 ]
 
@@ -314,6 +386,7 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
       quotesList = DEFAULT_STOCK_QUOTES
     }
 
+    const ALL_10_TICKERS = ["BBCA", "BBRI", "BMRI", "BBNI", "BRIS", "BNGA", "BDMN", "BBTN", "BJBR", "BJTM"]
     const quoteMap = new Map<string, BackendStockQuote>()
     for (const q of quotesList) {
       if (q && q.ticker) {
@@ -321,139 +394,132 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
       }
     }
 
+    let fundList: BackendFundamentalScore[] = []
     if (fundRes && fundRes.ok) {
-      const fundJson = await fundRes.json()
-      const fundList: BackendFundamentalScore[] = Array.isArray(fundJson)
-        ? fundJson
-        : fundJson.data || []
-
-      if (Array.isArray(fundList) && fundList.length > 0) {
-        let flowAnomalies: BackendForeignFlowAnomaly[] = []
-        if (flowRes && flowRes.ok) {
-          try {
-            const flowJson = await flowRes.json()
-            flowAnomalies = Array.isArray(flowJson) ? flowJson : flowJson.data || []
-          } catch {
-          }
-        }
-
-        const anomalyMap = new Map<string, BackendForeignFlowAnomaly>()
-        for (const item of flowAnomalies) {
-          if (item && item.ticker && !anomalyMap.has(item.ticker)) {
-            anomalyMap.set(item.ticker, item)
-          }
-        }
-
-        const latestFundMap = new Map<string, BackendFundamentalScore>()
-        for (const item of fundList) {
-          if (!latestFundMap.has(item.ticker)) {
-            latestFundMap.set(item.ticker, item)
-          } else {
-            const existing = latestFundMap.get(item.ticker)!
-            if ((item.kuartal || "") > (existing.kuartal || "")) {
-              latestFundMap.set(item.ticker, item)
-            }
-          }
-        }
-        const uniqueList = Array.from(latestFundMap.values())
-
-        return uniqueList.map((item) => {
-          const meta = BANK_WATCHLIST_META[item.ticker] || {
-            name: `PT Bank ${item.ticker} Tbk`,
-            subsector: "Bank KBMI 3",
-            category: "KBMI 3",
-            price: 2500,
-            priceChange: 0.0,
-          }
-
-          const quote = quoteMap.get(item.ticker.toUpperCase())
-          const livePrice = quote?.price ?? quote?.close ?? meta.price
-          const livePriceChange = quote?.change_percent ?? quote?.changePercent ?? quote?.change ?? meta.priceChange
-          const liveCoverage = quote?.coverage ?? quote?.analyst_coverage ?? quote?.analystCoverage ?? 28
-
-          const score = Math.round(item.skor_akhir ?? 70)
-          const anomaly = anomalyMap.get(item.ticker)
-
-          let quarter = "Q2"
-          let addedAt = item.kuartal || "Q2 2026"
-          if (item.kuartal) {
-            if (item.kuartal.includes("-")) {
-              const parts = item.kuartal.split("-")
-              quarter = parts[1] || "Q2"
-              addedAt = `${parts[1]} ${parts[0]}`
-            } else {
-              quarter = item.kuartal
-            }
-          }
-
-          let ingestionDetail = `${quarter}/Fin + 90d`
-          let status: "Stabil" | "Waspada" | "Perhatian Khusus" = "Stabil"
-
-          if (anomaly) {
-            const topBroker =
-              Array.isArray(anomaly.broker_details) && anomaly.broker_details.length > 0
-                ? anomaly.broker_details[0]
-                : undefined
-            const targetVal =
-              topBroker?.net_value !== undefined ? topBroker.net_value : anomaly.net_foreign_inflow
-            const amountM = Math.abs(Math.round(targetVal / 1000000000))
-
-            if (anomaly.status_anomali === "ANOMALI_OUTFLOW") {
-              ingestionDetail = `Anomali ${amountM}M Out`
-              status = "Perhatian Khusus"
-            } else if (anomaly.status_anomali === "ANOMALI_INFLOW") {
-              ingestionDetail = `Inflow ${amountM}M`
-              if (item.health_status === "Sangat Sehat" || item.health_status === "Sehat" || score >= 75) {
-                status = "Stabil"
-              } else if (item.health_status === "Waspada" || score >= 60) {
-                status = "Waspada"
-              } else {
-                status = "Perhatian Khusus"
-              }
-            } else {
-              if (item.health_status === "Sangat Sehat" || item.health_status === "Sehat" || score >= 75) {
-                status = "Stabil"
-              } else if (item.health_status === "Waspada" || score >= 60) {
-                status = "Waspada"
-              } else {
-                status = "Perhatian Khusus"
-              }
-            }
-          } else {
-            if (item.health_status === "Sangat Sehat" || item.health_status === "Sehat" || score >= 75) {
-              status = "Stabil"
-            } else if (item.health_status === "Waspada" || score >= 60) {
-              status = "Waspada"
-            } else {
-              status = "Perhatian Khusus"
-            }
-          }
-
-          return {
-            ticker: item.ticker,
-            name: meta.name,
-            subsector: meta.subsector,
-            category: meta.category,
-            addedAt,
-            ingestionStatus: "Lengkap" as const,
-            ingestionDetail,
-            fundamentalScore: score,
-            status,
-            price: livePrice,
-            priceChange: livePriceChange,
-            analystCoverage: liveCoverage,
-          }
-        })
+      try {
+        const fundJson = await fundRes.json()
+        fundList = Array.isArray(fundJson) ? fundJson : fundJson.data || []
+      } catch {
       }
     }
 
-    return MOCK_WATCHED_STOCKS.map((stock) => {
-      const quote = quoteMap.get(stock.ticker.toUpperCase())
+    const latestFundMap = new Map<string, BackendFundamentalScore>()
+    for (const item of fundList) {
+      if (item && item.ticker) {
+        const t = item.ticker.toUpperCase()
+        if (!latestFundMap.has(t)) {
+          latestFundMap.set(t, item)
+        } else {
+          const existing = latestFundMap.get(t)!
+          if ((item.kuartal || "") > (existing.kuartal || "")) {
+            latestFundMap.set(t, item)
+          }
+        }
+      }
+    }
+
+    let flowAnomalies: BackendForeignFlowAnomaly[] = []
+    if (flowRes && flowRes.ok) {
+      try {
+        const flowJson = await flowRes.json()
+        flowAnomalies = Array.isArray(flowJson) ? flowJson : flowJson.data || []
+      } catch {
+      }
+    }
+
+    const anomalyMap = new Map<string, BackendForeignFlowAnomaly>()
+    for (const item of flowAnomalies) {
+      if (item && item.ticker && !anomalyMap.has(item.ticker.toUpperCase())) {
+        anomalyMap.set(item.ticker.toUpperCase(), item)
+      }
+    }
+
+    const targetTickers = Array.from(
+      new Set([
+        ...quotesList.map((q) => (q.ticker || "").toUpperCase()).filter(Boolean),
+        ...ALL_10_TICKERS,
+      ])
+    )
+
+    return targetTickers.map((ticker) => {
+      const quote = quoteMap.get(ticker) || { ticker }
+      const meta = BANK_WATCHLIST_META[ticker] || {
+        name: quote.name || `PT Bank ${ticker} Tbk`,
+        subsector: "Perbankan Nasional",
+        category: "KBMI 3",
+        price: 2500,
+        priceChange: 0.0,
+      }
+
+      const fundItem = latestFundMap.get(ticker)
+      const anomaly = anomalyMap.get(ticker)
+
+      const price = quote.price ?? quote.close ?? meta.price
+      const priceChange = quote.change_percent ?? quote.changePercent ?? quote.change ?? meta.priceChange
+      const fundamentalScore = fundItem ? Math.round(fundItem.skor_akhir) : 75
+      const nimScore = fundItem ? Math.round(fundItem.nim_score) : 75
+
+      const rawStatus = fundItem ? fundItem.health_status || "Stabil" : "Stabil"
+      const status: "Stabil" | "Waspada" | "Perhatian Khusus" = anomaly?.status_anomali === "ANOMALI_OUTFLOW"
+        ? "Perhatian Khusus"
+        : rawStatus === "Sangat Sehat" || rawStatus === "Sehat"
+        ? "Stabil"
+        : rawStatus === "Cukup"
+        ? "Waspada"
+        : "Stabil"
+
+      const category = ["BBCA", "BBRI", "BMRI", "BBNI"].includes(ticker)
+        ? "KBMI 4"
+        : ["BRIS", "BNGA", "BDMN", "BBTN"].includes(ticker)
+        ? "KBMI 3"
+        : "KBMI 2"
+
+      const subsector = meta.subsector || "Perbankan Nasional"
+      const analystCoverage = quote.coverage || quote.analyst_coverage || quote.analystCoverage || 28
+
+      let quarter = "Q2"
+      let addedAt = fundItem?.kuartal || "Q2 2026"
+      if (fundItem?.kuartal) {
+        if (fundItem.kuartal.includes("-")) {
+          const parts = fundItem.kuartal.split("-")
+          quarter = parts[1] || "Q2"
+          addedAt = `${parts[1]} ${parts[0]}`
+        } else {
+          quarter = fundItem.kuartal
+        }
+      }
+
+      let ingestionDetail = `${quarter}/Fin + 90d`
+      if (anomaly) {
+        const topBroker =
+          Array.isArray(anomaly.broker_details) && anomaly.broker_details.length > 0
+            ? anomaly.broker_details[0]
+            : undefined
+        const targetVal =
+          topBroker?.net_value !== undefined ? topBroker.net_value : anomaly.net_foreign_inflow
+        const amountM = Math.abs(Math.round(targetVal / 1000000000))
+
+        if (anomaly.status_anomali === "ANOMALI_OUTFLOW") {
+          ingestionDetail = `Anomali ${amountM}M Out`
+        } else if (anomaly.status_anomali === "ANOMALI_INFLOW") {
+          ingestionDetail = `Inflow ${amountM}M`
+        }
+      }
+
       return {
-        ...stock,
-        price: quote?.price ?? quote?.close ?? stock.price,
-        priceChange: quote?.change_percent ?? quote?.changePercent ?? quote?.change ?? stock.priceChange,
-        analystCoverage: quote?.coverage ?? quote?.analyst_coverage ?? quote?.analystCoverage ?? 28,
+        ticker,
+        name: quote.name || meta.name,
+        price,
+        priceChange,
+        fundamentalScore,
+        nimScore,
+        status,
+        category,
+        subsector,
+        analystCoverage,
+        addedAt,
+        ingestionStatus: "Lengkap" as const,
+        ingestionDetail,
       }
     })
   } catch {

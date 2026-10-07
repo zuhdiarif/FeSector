@@ -9,6 +9,7 @@ export interface WatchedStock {
   ingestionStatus: "Lengkap" | "Sinkronisasi" | "Tertunda"
   ingestionDetail?: string
   fundamentalScore: number
+  nimScore?: number
   status: StatusType | "STABLE" | "WARNING" | "CRITICAL" | "Stabil" | "Waspada" | "Perhatian Khusus"
   price: number
   priceChange: number
