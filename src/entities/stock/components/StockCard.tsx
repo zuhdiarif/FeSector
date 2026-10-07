@@ -38,8 +38,8 @@ export const StockCard: React.FC<StockCardProps> = ({ stock, className }) => {
       className={cn(
         "flex flex-col justify-between bg-surface-card p-4 sm:p-space-lg rounded border border-border-subtle hover:bg-surface-container-low/80 hover:border-border-subtle/80 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 relative overflow-hidden group select-none",
         isCritical && "border-brand-red/40 hover:border-brand-red/60",
-        isOutflowAnomaly && "border-data-bearish/40 hover:border-data-bearish/60",
-        isInflowAnomaly && "border-data-bullish/30 hover:border-data-bullish/50",
+        isOutflowAnomaly && "border-data-bearish/40 hover:border-data-bearish/70 hover:shadow-[0_0_18px_rgba(194,59,59,0.2)]",
+        isInflowAnomaly && "border-data-bullish/30 hover:border-data-bullish/70 hover:shadow-[0_0_18px_rgba(63,174,106,0.2)]",
         className
       )}
     >
@@ -199,3 +199,5 @@ export const StockCard: React.FC<StockCardProps> = ({ stock, className }) => {
     </div>
   )
 }
+
+export default StockCard

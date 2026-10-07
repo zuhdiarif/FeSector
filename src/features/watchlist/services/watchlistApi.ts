@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/src/shared/lib/constants"
+import { DEFAULT_STOCK_QUOTES } from "@/src/features/market"
 import { WatchedStock, SearchStockResult, IngestionWorkerStatus } from "../types/watchlist"
 
 export interface BackendFundamentalScore {
@@ -275,6 +276,7 @@ export interface BackendStockQuote {
   change?: number
   change_percent?: number
   changePercent?: number
+  coverage?: number
   analyst_coverage?: number
   analystCoverage?: number
 }
@@ -296,6 +298,22 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
       } catch {
       }
     }
+
+    if (quotesList.length === 0 && typeof window !== "undefined") {
+      try {
+        const localRes = await fetch("/api/v1/stocks/quotes", { cache: "no-store" })
+        if (localRes.ok) {
+          const localJson = await localRes.json()
+          quotesList = Array.isArray(localJson) ? localJson : localJson.data || []
+        }
+      } catch {
+      }
+    }
+
+    if (quotesList.length === 0) {
+      quotesList = DEFAULT_STOCK_QUOTES
+    }
+
     const quoteMap = new Map<string, BackendStockQuote>()
     for (const q of quotesList) {
       if (q && q.ticker) {
@@ -351,7 +369,7 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
           const quote = quoteMap.get(item.ticker.toUpperCase())
           const livePrice = quote?.price ?? quote?.close ?? meta.price
           const livePriceChange = quote?.change_percent ?? quote?.changePercent ?? quote?.change ?? meta.priceChange
-          const liveCoverage = quote?.analyst_coverage ?? quote?.analystCoverage ?? 24
+          const liveCoverage = quote?.coverage ?? quote?.analyst_coverage ?? quote?.analystCoverage ?? 28
 
           const score = Math.round(item.skor_akhir ?? 70)
           const anomaly = anomalyMap.get(item.ticker)
@@ -435,12 +453,15 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
         ...stock,
         price: quote?.price ?? quote?.close ?? stock.price,
         priceChange: quote?.change_percent ?? quote?.changePercent ?? quote?.change ?? stock.priceChange,
-        analystCoverage: quote?.analyst_coverage ?? quote?.analystCoverage ?? 24,
+        analystCoverage: quote?.coverage ?? quote?.analyst_coverage ?? quote?.analystCoverage ?? 28,
       }
     })
   } catch {
   }
-  return MOCK_WATCHED_STOCKS
+  return MOCK_WATCHED_STOCKS.map((stock) => ({
+    ...stock,
+    analystCoverage: stock.analystCoverage ?? 24,
+  }))
 }
 
 export async function searchStocks(query: string): Promise<SearchStockResult[]> {

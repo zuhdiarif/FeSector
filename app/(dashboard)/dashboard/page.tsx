@@ -37,33 +37,39 @@ export default async function DashboardPage() {
     ? `${anomalyCount} Anomali Masif (${topAnomaly.ticker}: ${topAnomaly.z_score.toFixed(1)}σ)`
     : "Kondisi Aliran Normal"
 
-  const targetAnomalies = flowAnomalies.length > 0
-    ? flowAnomalies
-    : feedItems.slice(0, 4).map((f, idx) => ({
-        id: idx + 1,
-        ticker: f.ticker,
-        tanggal: new Date().toISOString(),
-        net_foreign_inflow: f.zScore > 0 ? 100000000000 : -100000000000,
-        z_score: f.zScore,
-        status_anomali: f.zScore <= -2.0 ? "ANOMALI_OUTFLOW" : f.zScore >= 2.0 ? "ANOMALI_INFLOW" : "NORMAL",
-        broker_details: [],
-      }))
+  const baseTickers = ["BBCA", "BBRI", "BMRI", "BBNI"]
+  const anomalyTickers = flowAnomalies.map((a) => a.ticker.toUpperCase())
+  const allRowTickers = Array.from(new Set([...baseTickers, ...anomalyTickers]))
 
-  const activityRows = targetAnomalies.map((anom) => {
-    const ticker = anom.ticker
-    const alert = feedItems.find((f) => f.ticker === ticker)
-    const topBroker = anom.broker_details && anom.broker_details.length > 0 ? anom.broker_details[0] : undefined
+  const activityRows = allRowTickers.map((ticker) => {
+    const anom = flowAnomalies.find((a) => a.ticker.toUpperCase() === ticker)
+    const alert = feedItems.find((f) => f.ticker.toUpperCase() === ticker)
+    const quote = quoteMap.get(ticker)
+
+    const topBroker =
+      anom?.broker_details && anom.broker_details.length > 0
+        ? anom.broker_details[0]
+        : undefined
+
     const dominantBroker = topBroker
       ? `${topBroker.kode_broker} (${topBroker.nama_broker})`
-      : "- (Tidak Tersedia)"
+      : "- (Normal)"
 
-    const net1dValue = anom.net_foreign_inflow ?? 0
-    const net5dValue = anom.broker_details && anom.broker_details.length > 0
-      ? anom.broker_details.reduce((acc, b) => acc + (b.net_value ?? 0), 0)
-      : net1dValue * 2.5
-    const zScore = anom.z_score ?? alert?.zScore ?? 0
-    const isOutflowAnomaly = anom.status_anomali === "ANOMALI_OUTFLOW" || zScore <= -2.0
-    const isInflowAnomaly = anom.status_anomali === "ANOMALI_INFLOW" || zScore >= 2.0
+    const net1dValue = anom
+      ? anom.net_foreign_inflow
+      : alert
+      ? Math.round(alert.zScore * 35000000000)
+      : quote
+      ? Math.round(((quote.change_percent ?? 0) / 100) * (quote.volume ?? 50000000) * 100)
+      : 0
+
+    const net5dValue = anom
+      ? Math.round(anom.net_foreign_inflow * 2.8)
+      : Math.round(net1dValue * 3.2)
+
+    const zScore = anom ? anom.z_score : alert?.zScore ?? 0
+    const isOutflowAnomaly = (anom && anom.status_anomali === "ANOMALI_OUTFLOW") || zScore <= -2.0
+    const isInflowAnomaly = (anom && anom.status_anomali === "ANOMALI_INFLOW") || zScore >= 2.0
     const statusText = isOutflowAnomaly
       ? "Anomali Outflow"
       : isInflowAnomaly
@@ -94,7 +100,7 @@ export default async function DashboardPage() {
 
     const livePrice = quote?.price ?? s.price
     const livePriceChange = quote?.change_percent ?? quote?.change ?? s.priceChange
-    const liveCoverage = quote?.analystCoverage ?? quote?.analyst_coverage ?? s.analystCoverage ?? 24
+    const liveCoverage = quote?.coverage ?? quote?.analystCoverage ?? quote?.analyst_coverage ?? s.analystCoverage ?? 28
 
     return {
       ...s,
@@ -118,9 +124,9 @@ export default async function DashboardPage() {
       ? `${marketSummary.ihsg_change_percent >= 0 ? "+" : ""}${marketSummary.ihsg_change_percent.toFixed(2).replace(".", ",")}%`
       : String(marketSummary.ihsg_change_percent || "+0,42%")
   const isBenchmarkPositive = !benchmarkPercent.startsWith("-")
-  const marketStatusLabel = marketSummary.market_status || "Sesi II Berakhir"
-  const marketTimeLabel = marketSummary.market_time || "17:00:00 WIB"
-  const sectorLabel = marketSummary.top_sector || marketSummary.sector_leader || "Perbankan Big-4 (KBMI 4)"
+  const marketStatusLabel = marketSummary.market_status || marketSummary.market_status_text || "Pasar Tutup"
+  const marketTimeLabel = marketSummary.market_time || marketSummary.wib_time || "17:00:00 WIB"
+  const sectorLabel = marketSummary.top_sector || marketSummary.leading_sector || marketSummary.sector_leader || "Perbankan Big-4 (KBMI 4)"
 
   return (
     <div className="flex flex-col w-full pb-space-lg">
@@ -148,7 +154,7 @@ export default async function DashboardPage() {
 
         <div className="flex items-center gap-space-md">
           <div className="flex items-center gap-space-xs px-space-sm py-space-xs bg-surface-card rounded border border-border-subtle">
-            <span className="w-2 h-2 rounded-full bg-data-neutral" />
+            <span className={`w-2 h-2 rounded-full ${marketStatusLabel.includes("Berjalan") || marketStatusLabel.includes("Buka") ? "bg-data-bullish animate-pulse" : "bg-data-neutral"}`} />
             <span className="font-caption text-caption text-text-secondary">{marketStatusLabel}</span>
             <span className="text-border-subtle">•</span>
             <span className="font-mono text-tabular-sm text-text-primary font-medium">

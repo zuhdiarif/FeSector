@@ -31,10 +31,20 @@ export const AnomalyBadge: React.FC<AnomalyBadgeProps> = ({
       ? "Anomali Waspada"
       : "Aliran Normal")
 
+  const glowClass = showPulse
+    ? isOutflow
+      ? "glow-anomaly-outflow"
+      : isInflow
+      ? "glow-anomaly-inflow"
+      : isWarning
+      ? "shadow-[0_0_10px_rgba(201,162,39,0.35)] animate-pulse"
+      : ""
+    : ""
+
   const styleConfig = isOutflow
     ? {
         container:
-          "bg-data-bearish/15 text-data-bearish border-data-bearish/40 shadow-[0_0_12px_rgba(194,59,59,0.4)]",
+          "bg-data-bearish/15 text-data-bearish border-data-bearish/50",
         dotPing: "bg-data-bearish",
         dotBase: "bg-data-bearish",
         icon: "trending_down",
@@ -42,7 +52,7 @@ export const AnomalyBadge: React.FC<AnomalyBadgeProps> = ({
     : isInflow
     ? {
         container:
-          "bg-data-bullish/15 text-data-bullish border-data-bullish/40 shadow-[0_0_12px_rgba(63,174,106,0.4)]",
+          "bg-data-bullish/15 text-data-bullish border-data-bullish/50",
         dotPing: "bg-data-bullish",
         dotBase: "bg-data-bullish",
         icon: "trending_up",
@@ -50,7 +60,7 @@ export const AnomalyBadge: React.FC<AnomalyBadgeProps> = ({
     : isWarning
     ? {
         container:
-          "bg-data-neutral/15 text-data-neutral border-data-neutral/40 shadow-[0_0_10px_rgba(201,162,39,0.35)]",
+          "bg-data-neutral/15 text-data-neutral border-data-neutral/40",
         dotPing: "bg-data-neutral",
         dotBase: "bg-data-neutral",
         icon: "warning",
@@ -72,6 +82,7 @@ export const AnomalyBadge: React.FC<AnomalyBadgeProps> = ({
       className={cn(
         "inline-flex items-center font-mono tracking-tight font-semibold rounded border select-none transition-all duration-200 uppercase",
         styleConfig.container,
+        glowClass,
         sizeStyles[size],
         className
       )}

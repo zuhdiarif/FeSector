@@ -6,7 +6,12 @@ import Image from "next/image"
 import { cn } from "@/src/shared/lib/cn"
 import { SearchInput } from "@/src/shared/ui/SearchInput"
 import { CommandPalette } from "@/src/shared/ui/CommandPalette"
-import { getMarketSummary, DEFAULT_MARKET_SUMMARY, MarketSummary } from "@/src/features/market"
+import {
+  getMarketSummary,
+  getWibTimeAndStatus,
+  DEFAULT_MARKET_SUMMARY,
+  MarketSummary,
+} from "@/src/features/market"
 
 export interface HeaderProps {
   className?: string
@@ -17,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const [marketSummary, setMarketSummary] = useState<MarketSummary>(DEFAULT_MARKET_SUMMARY)
   const [wibTime, setWibTime] = useState<string>("17:00:00 WIB")
+  const [currentStatus, setCurrentStatus] = useState<string>("Pasar Tutup")
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -24,28 +30,22 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
   )
 
   useEffect(() => {
-    getMarketSummary().then((data) => {
-      if (data) setMarketSummary(data)
-    })
-
-    const formatWib = () => {
-      const now = new Date()
-      return (
-        new Intl.DateTimeFormat("id-ID", {
-          timeZone: "Asia/Jakarta",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-        })
-          .format(now)
-          .replace(/\./g, ":") + " WIB"
-      )
+    const updateTimeAndStatus = () => {
+      const { formattedTime, status } = getWibTimeAndStatus()
+      setWibTime(formattedTime)
+      setCurrentStatus(status)
     }
 
-    const timer = setInterval(() => {
-      setWibTime(formatWib())
-    }, 1000)
+    updateTimeAndStatus()
+    const timer = setInterval(updateTimeAndStatus, 1000)
+
+    const fetchSummary = () => {
+      getMarketSummary().then((data) => {
+        if (data) setMarketSummary(data)
+      })
+    }
+    fetchSummary()
+    const summaryInterval = setInterval(fetchSummary, 30000)
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -57,6 +57,7 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
     window.addEventListener("keydown", handleKeyDown)
     return () => {
       clearInterval(timer)
+      clearInterval(summaryInterval)
       window.removeEventListener("keydown", handleKeyDown)
     }
   }, [])
@@ -77,7 +78,10 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
   const isIhsgPositive = !ihsgChangeRaw.startsWith("-")
 
   const foreignFlowFormatted =
-    marketSummary.total_foreign_flow_formatted || "+Rp 210M"
+    marketSummary.total_foreign_flow_formatted ||
+    (typeof marketSummary.total_foreign_flow === "number"
+      ? `${marketSummary.total_foreign_flow >= 0 ? "+" : "-"}Rp ${(Math.abs(marketSummary.total_foreign_flow) / 1e9).toFixed(0)} M`
+      : "+Rp 31 M")
   const isFlowPositive = !foreignFlowFormatted.startsWith("-")
 
   const sectorIndicator =
@@ -86,29 +90,12 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
     marketSummary.active_sector ||
     "Perbankan Big 4"
 
-  const getMarketStatus = () => {
-    if (!mounted) return marketSummary.market_status || "Pasar Tutup"
-    if (marketSummary.market_status && marketSummary.market_status !== "Pasar Tutup") {
-      return marketSummary.market_status
-    }
-    const now = new Date()
-    const wibHour = parseInt(
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: "Asia/Jakarta",
-        hour: "numeric",
-        hour12: false,
-      }).format(now),
-      10
-    )
-    const day = now.getDay()
-    if (day === 0 || day === 6) return "Pasar Tutup"
-    if (wibHour >= 9 && wibHour < 12) return "Sesi I Buka"
-    if (wibHour >= 12 && wibHour < 13.5) return "Istirahat Pasar"
-    if (wibHour >= 13.5 && wibHour < 16) return "Sesi II Buka"
-    return "Pasar Tutup"
-  }
+  const marketStatus = mounted
+    ? (marketSummary.market_status && !["Pasar Tutup", "Sesi I Buka", "Istirahat Pasar", "Sesi II Buka", "Pra-Penutupan"].includes(marketSummary.market_status)
+        ? marketSummary.market_status
+        : currentStatus)
+    : (marketSummary.market_status || "Pasar Tutup")
 
-  const marketStatus = getMarketStatus()
   const isMarketOpen = marketStatus.includes("Buka")
 
   return (

@@ -217,9 +217,9 @@ export default async function ComparePage() {
 
               <tr className="hover:bg-surface-container-low">
                 <td className="px-space-md py-space-sm font-medium text-text-secondary">Price to Book (PBV)</td>
-                <td className="px-space-md py-space-sm font-mono">3.10x</td>
-                <td className="px-space-md py-space-sm font-mono text-data-bullish font-bold">1.80x (Termurah)</td>
-                <td className="px-space-md py-space-sm font-mono">2.38x</td>
+                <td className="px-space-md py-space-sm font-mono">{bbcaQuote?.pbv !== undefined ? `${bbcaQuote.pbv.toFixed(2)}x` : "3.10x"}</td>
+                <td className="px-space-md py-space-sm font-mono text-data-bullish font-bold">{bmriQuote?.pbv !== undefined ? `${bmriQuote.pbv.toFixed(2)}x` : "1.80x"} (Termurah)</td>
+                <td className="px-space-md py-space-sm font-mono">{bbriQuote?.pbv !== undefined ? `${bbriQuote.pbv.toFixed(2)}x` : "2.38x"}</td>
               </tr>
 
               <tr className="hover:bg-surface-container-low">

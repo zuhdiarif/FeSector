@@ -258,6 +258,8 @@ export default async function StockDetailPage({ params }: Props) {
         volume: quote.volume ? `${(quote.volume / 1e6).toFixed(2)} M Lbr` : initialProfile.volume,
         marketCap: quote.market_cap ? `Rp ${(quote.market_cap / 1e12).toFixed(2)} T` : initialProfile.marketCap,
         analystConsensus: quote.analyst_coverage ? `${quote.analyst_coverage} Analis` : initialProfile.analystConsensus,
+        pbvRatio: quote.pbv !== undefined ? `${quote.pbv.toFixed(2).replace(".", ",")}x` : initialProfile.pbvRatio,
+        peRatio: quote.pe !== undefined ? `${quote.pe.toFixed(2).replace(".", ",")}x` : initialProfile.peRatio,
       }
     : initialProfile
 

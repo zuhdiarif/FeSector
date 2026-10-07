@@ -54,14 +54,18 @@ export function sanitizeTextInput(input: unknown, maxLength: number = 2000): str
   if (typeof input !== "string") {
     return ""
   }
-  const strippedTags = input
+  return input
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
-    .replace(/<[^>]*>/g, "")
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+    .replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*\/?>/gi, "")
+    .replace(/javascript\s*:/gi, "")
+    .replace(/vbscript\s*:/gi, "")
+    .replace(/data\s*:\s*text\/html/gi, "")
     .slice(0, maxLength)
     .trim()
-  return escapeHtml(strippedTags)
 }
 
 export function sanitizeHtml(input: unknown, maxLength: number = 2000): string {
-  return sanitizeTextInput(input, maxLength)
+  return escapeHtml(sanitizeTextInput(input, maxLength))
 }

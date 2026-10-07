@@ -84,8 +84,8 @@ export const AnomalyTable: React.FC<AnomalyTableProps> = ({
                     <span
                       className={`inline-flex items-center px-1.5 py-0.5 rounded font-mono tracking-tight font-semibold border ${
                         isSell
-                          ? "bg-data-bearish/15 text-data-bearish border-data-bearish/40 shadow-[0_0_8px_rgba(194,59,59,0.3)] animate-pulse"
-                          : "bg-data-bullish/15 text-data-bullish border-data-bullish/40 shadow-[0_0_8px_rgba(63,174,106,0.3)] animate-pulse"
+                          ? "bg-data-bearish/15 text-data-bearish border-data-bearish/50 glow-anomaly-outflow"
+                          : "bg-data-bullish/15 text-data-bullish border-data-bullish/50 glow-anomaly-inflow"
                       }`}
                     >
                       {anom.zScore >= 0 ? `+${anom.zScore}` : anom.zScore}σ
