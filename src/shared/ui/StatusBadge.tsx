@@ -55,7 +55,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   return (
     <span
       className={cn(
-        "inline-flex items-center font-semibold rounded border select-none tracking-wide",
+        "inline-flex items-center font-semibold rounded border select-none tracking-wide whitespace-nowrap shrink-0",
         config.container,
         sizeClasses[size],
         className

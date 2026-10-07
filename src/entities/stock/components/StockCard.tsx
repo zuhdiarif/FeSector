@@ -48,7 +48,7 @@ export const StockCard: React.FC<StockCardProps> = ({ stock, className }) => {
 
       <div className="flex flex-col gap-space-md relative z-10">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-center gap-space-xs">
               <span className="font-label-ticker text-[20px] font-bold text-text-primary tracking-wide">
                 {stock.ticker}
@@ -57,12 +57,12 @@ export const StockCard: React.FC<StockCardProps> = ({ stock, className }) => {
                 {stock.category}
               </span>
             </div>
-            <span className="font-body-sm text-body-sm text-text-secondary truncate max-w-[170px] sm:max-w-[200px]">
+            <span className="font-body-sm text-body-sm text-text-secondary truncate block w-full">
               {stock.name}
             </span>
           </div>
 
-          <div className="flex flex-col items-end shrink-0">
+          <div className="flex items-center shrink-0 pl-1">
             <StatusBadge status={stock.status} size="sm" />
           </div>
         </div>
