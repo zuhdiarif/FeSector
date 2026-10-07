@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { FundamentalScoreCard, getFundamentalScore } from "@/src/features/fundamental"
 import { SentimentCard, PolicyExposureCard, getSentimentData } from "@/src/features/sentiment"
 import { ForeignFlowChart, getForeignFlowData } from "@/src/features/foreign-flow"
+import { StockModeView, getBeginnerBrief, getGlossary } from "@/src/features/beginner-brief"
 import { StatusBadge } from "@/src/shared/ui/StatusBadge"
 import { isValidTicker } from "@/src/shared/lib"
 
@@ -235,10 +236,12 @@ export default async function StockDetailPage({ params }: Props) {
   }
   const upperTicker = ticker.toUpperCase()
 
-  const [fundamentalData, sentimentData, foreignFlowData] = await Promise.all([
+  const [fundamentalData, sentimentData, foreignFlowData, brief, glossary] = await Promise.all([
     getFundamentalScore(upperTicker),
     getSentimentData(upperTicker),
     getForeignFlowData(upperTicker),
+    getBeginnerBrief(upperTicker),
+    getGlossary(),
   ])
 
   const profile = getStockProfile(upperTicker, fundamentalData.bankName)
@@ -316,7 +319,8 @@ export default async function StockDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <div className="w-full bg-brand-red-soft p-space-lg rounded border border-brand-red/50 flex flex-col md:flex-row md:items-center justify-between gap-space-md relative overflow-hidden mb-space-xl">
+      <StockModeView ticker={upperTicker} brief={brief} glossary={glossary}>
+        <div className="w-full bg-brand-red-soft p-space-lg rounded border border-brand-red/50 flex flex-col md:flex-row md:items-center justify-between gap-space-md relative overflow-hidden mb-space-xl">
         <div className="absolute -right-8 -top-8 w-48 h-48 bg-brand-red/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex items-start gap-space-md z-10">
@@ -567,6 +571,7 @@ export default async function StockDetailPage({ params }: Props) {
           </div>
         </div>
       </div>
+      </StockModeView>
     </div>
   )
 }

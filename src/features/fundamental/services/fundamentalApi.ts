@@ -247,27 +247,113 @@ function createFallbackFundamental(ticker: string): FundamentalScoreDetail {
   }
 }
 
+const BANK_METADATA: Record<string, { name: string; category: string }> = {
+  BBCA: { name: "Bank Central Asia Tbk", category: "KBMI 4" },
+  BMRI: { name: "Bank Mandiri (Persero) Tbk", category: "KBMI 4" },
+  BBNI: { name: "Bank Negara Indonesia Tbk", category: "KBMI 4" },
+  BBRI: { name: "Bank Rakyat Indonesia Tbk", category: "KBMI 4" },
+  BRIS: { name: "Bank Syariah Indonesia Tbk", category: "KBMI 3" },
+  BBTN: { name: "Bank Tabungan Negara Tbk", category: "KBMI 3" },
+  BDMN: { name: "Bank Danamon Indonesia Tbk", category: "KBMI 3" },
+}
+
+interface BackendFundamentalScore {
+  id?: number
+  ticker: string
+  kuartal?: string
+  nim_score?: number
+  ldr_score?: number
+  loan_growth_score?: number
+  deposit_growth_score?: number
+  roe_score?: number
+  konsistensi_score?: number
+  dividend_score?: number
+  skor_akhir?: number
+  health_status?: string
+}
+
+function resolveStatus(status?: string, score = 70): "Stabil" | "Waspada" | "Perhatian Khusus" {
+  if (status === "Sangat Sehat" || status === "Sehat" || score >= 75) return "Stabil"
+  if (status === "Waspada" || score >= 60) return "Waspada"
+  return "Perhatian Khusus"
+}
+
 export async function getFundamentalScore(ticker: string): Promise<FundamentalScoreDetail> {
   const upper = (ticker || "BBRI").toUpperCase()
-  if (!API_BASE_URL) return MOCK_FUNDAMENTAL_DETAILS[upper] || createFallbackFundamental(upper)
+  const fallback = MOCK_FUNDAMENTAL_DETAILS[upper] || createFallbackFundamental(upper)
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/fundamental-score/${upper}`)
-    if (!res.ok) throw new Error("Gagal mengambil skor fundamental")
-    const json = await res.json()
-    return json.data || json
+    const res = await fetch(`${baseUrl}/api/v1/fundamental-score/${upper}`, { cache: "no-store" })
+    if (res.ok) {
+      const data: BackendFundamentalScore = await res.json()
+      if (data && data.ticker) {
+        const score = Math.round(data.skor_akhir ?? fallback.score)
+        const nimScore = Math.round(data.nim_score ?? fallback.nimScore)
+        const ldrScore = Math.round(data.ldr_score ?? fallback.ldrScore)
+        const loanGrowthScore = Math.round(data.loan_growth_score ?? fallback.loanGrowthScore)
+        const depositGrowthScore = Math.round(data.deposit_growth_score ?? fallback.depositGrowthScore)
+        const roeScore = Math.round(data.roe_score ?? fallback.roeScore)
+        const profitConsistencyScore = Math.round(data.konsistensi_score ?? fallback.profitConsistencyScore)
+        const dividendScore = Math.round(data.dividend_score ?? fallback.dividendScore)
+        const status = resolveStatus(data.health_status, score)
+
+        return {
+          ...fallback,
+          ticker: upper,
+          quarter: data.kuartal || fallback.quarter,
+          score,
+          status,
+          nimScore,
+          ldrScore,
+          loanGrowthScore,
+          depositGrowthScore,
+          roeScore,
+          profitConsistencyScore,
+          dividendScore,
+          dimensions: [
+            { key: "nim", name: "Margin Bunga Bersih (NIM)", score: nimScore, weight: 20, rawValue: fallback.financialMetrics.nim, percentileRank: nimScore, evaluation: nimScore >= 80 ? "Kuat" : "Baik" },
+            { key: "ldr", name: "Rasio Kredit-Simpanan (LDR)", score: ldrScore, weight: 15, rawValue: fallback.financialMetrics.ldr, evaluation: ldrScore >= 80 ? "Optimal (Sweet-spot)" : "Sehat" },
+            { key: "loanGrowth", name: "Pertumbuhan Kredit YoY", score: loanGrowthScore, weight: 15, rawValue: fallback.financialMetrics.loanGrowthYoY, percentileRank: loanGrowthScore, evaluation: loanGrowthScore >= 75 ? "Kuat" : "Sehat" },
+            { key: "depositGrowth", name: "Pertumbuhan Simpanan YoY", score: depositGrowthScore, weight: 10, rawValue: fallback.financialMetrics.depositGrowthYoY, percentileRank: depositGrowthScore, evaluation: "Cukup" },
+            { key: "roe", name: "Return on Equity (ROE)", score: roeScore, weight: 15, rawValue: fallback.financialMetrics.roe, percentileRank: roeScore, evaluation: roeScore >= 85 ? "Sangat Kuat" : "Kuat" },
+            { key: "profitConsistency", name: "Konsistensi Laba", score: profitConsistencyScore, weight: 15, rawValue: fallback.dimensions.find((d) => d.key === "profitConsistency")?.rawValue || "7/8 Kuartal", evaluation: "Konsisten" },
+            { key: "dividend", name: "Keandalan Dividen", score: dividendScore, weight: 10, rawValue: fallback.dimensions.find((d) => d.key === "dividend")?.rawValue || "4.5%", percentileRank: dividendScore, evaluation: dividendScore >= 75 ? "Tinggi" : "Baik" },
+          ],
+        }
+      }
+    }
   } catch {
-    return MOCK_FUNDAMENTAL_DETAILS[upper] || createFallbackFundamental(upper)
   }
+  return fallback
 }
 
 export async function getScreenerData(): Promise<ScreenerBankItem[]> {
-  if (!API_BASE_URL) return MOCK_SCREENER_DATA
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/fundamental-score`)
-    if (!res.ok) throw new Error("Gagal mengambil data screener")
-    const json = await res.json()
-    return json.data || json
+    const res = await fetch(`${baseUrl}/api/v1/fundamental-score`, { cache: "no-store" })
+    if (res.ok) {
+      const json = await res.json()
+      const list: BackendFundamentalScore[] = Array.isArray(json) ? json : json.data || []
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((item) => {
+          const info = BANK_METADATA[item.ticker] || { name: `PT Bank ${item.ticker} Tbk`, category: "KBMI 3" }
+          const score = Math.round(item.skor_akhir ?? 70)
+          return {
+            ticker: item.ticker,
+            name: info.name,
+            category: info.category,
+            score,
+            nim: Math.round(item.nim_score ?? 70),
+            ldr: Math.round(item.ldr_score ?? 70),
+            loanGrowth: Math.round(item.loan_growth_score ?? 70),
+            roe: Math.round(item.roe_score ?? 70),
+            dividend: Math.round(item.dividend_score ?? 70),
+            status: resolveStatus(item.health_status, score),
+          }
+        })
+      }
+    }
   } catch {
-    return MOCK_SCREENER_DATA
   }
+  return MOCK_SCREENER_DATA
 }

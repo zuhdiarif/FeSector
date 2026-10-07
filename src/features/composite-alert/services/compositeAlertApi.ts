@@ -104,26 +104,98 @@ export const MOCK_ALERT_FEED: AlertFeedItem[] = [
   },
 ]
 
+interface BackendCompositeAlert {
+  ticker: string
+  overall_status: string
+  headline: string
+  synthesis_summary: string
+  fundamental_score: number
+  company_sentiment: number
+  policy_exposure: number
+  foreign_anomaly: string
+  crowd_sentiment: number
+  bullish_percent: number
+  divergence_status: string
+  trigger_factors?: string[]
+}
+
+const BANK_NAMES: Record<string, string> = {
+  BBRI: "PT Bank Rakyat Indonesia Tbk",
+  BBCA: "PT Bank Central Asia Tbk",
+  BMRI: "PT Bank Mandiri (Persero) Tbk",
+  BBNI: "PT Bank Negara Indonesia Tbk",
+  BBTN: "PT Bank Tabungan Negara Tbk",
+  BDMN: "PT Bank Danamon Indonesia Tbk",
+}
+
+function resolveCompositeStatus(status: string): "Stabil" | "Waspada" | "Perhatian Khusus" {
+  if (status === "Perhatian Khusus") return "Perhatian Khusus"
+  if (status === "Waspada" || status === "Peluang Rebound") return "Waspada"
+  return "Stabil"
+}
+
 export async function getPrimaryAlert(): Promise<CompositeAlert> {
-  if (!API_BASE_URL) return MOCK_PRIMARY_ALERT
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/composite-alert/primary`)
-    if (!res.ok) throw new Error("Gagal mengambil primary alert")
-    const json = await res.json()
-    return json.data || json
+    const res = await fetch(`${baseUrl}/api/v1/composite-alert/summary`, { cache: "no-store" })
+    if (res.ok) {
+      const list: BackendCompositeAlert[] = await res.json()
+      if (Array.isArray(list) && list.length > 0) {
+        const top = list.find((item) => item.overall_status === "Perhatian Khusus" || item.overall_status === "Peluang Rebound") || list[0]
+        const zScore = top.foreign_anomaly === "ANOMALI_OUTFLOW" ? -2.8 : top.foreign_anomaly === "ANOMALI_INFLOW" ? 2.45 : 0.0
+        return {
+          id: `alert-${top.ticker.toLowerCase()}-live`,
+          ticker: top.ticker,
+          bankName: BANK_NAMES[top.ticker] || `Bank ${top.ticker} Tbk`,
+          timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
+          timeAgo: "Sesi Terkini",
+          headline: top.headline,
+          summary: top.synthesis_summary,
+          status: resolveCompositeStatus(top.overall_status),
+          zScore,
+          fundamentalScore: Math.round(top.fundamental_score),
+          policyExposure: top.policy_exposure,
+          confidence: 94.2,
+          recommendedAction: top.trigger_factors && top.trigger_factors.length > 0 ? top.trigger_factors.join(" • ") : "Pantau pergerakan harga dan arus volume transaksi",
+        }
+      }
+    }
   } catch {
-    return MOCK_PRIMARY_ALERT
   }
+  return MOCK_PRIMARY_ALERT
 }
 
 export async function getAlertFeed(): Promise<AlertFeedItem[]> {
-  if (!API_BASE_URL) return MOCK_ALERT_FEED
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/composite-alert/feed`)
-    if (!res.ok) throw new Error("Gagal mengambil feed sinyal")
-    const json = await res.json()
-    return json.data || json
+    const res = await fetch(`${baseUrl}/api/v1/composite-alert/summary`, { cache: "no-store" })
+    if (res.ok) {
+      const list: BackendCompositeAlert[] = await res.json()
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((item, idx) => {
+          const triggerPillars: ("fundamental" | "sentiment" | "foreign_flow")[] = []
+          if (item.fundamental_score > 0) triggerPillars.push("fundamental")
+          if (item.foreign_anomaly !== "NORMAL") triggerPillars.push("foreign_flow")
+          if (item.company_sentiment !== 0 || item.policy_exposure !== 0) triggerPillars.push("sentiment")
+          const zScore = item.foreign_anomaly === "ANOMALI_OUTFLOW" ? -2.8 : item.foreign_anomaly === "ANOMALI_INFLOW" ? 2.45 : 0.0
+          return {
+            id: `feed-live-${idx + 1}`,
+            ticker: item.ticker,
+            bankName: BANK_NAMES[item.ticker] || `Bank ${item.ticker} Tbk`,
+            timestamp: new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) + ", 16:00 WIB",
+            timeAgo: "Sesi Hari Ini",
+            title: item.headline,
+            description: item.synthesis_summary,
+            status: resolveCompositeStatus(item.overall_status),
+            zScore,
+            fundamentalScore: Math.round(item.fundamental_score),
+            policyExposure: item.policy_exposure,
+            triggerPillars: triggerPillars.length > 0 ? triggerPillars : ["fundamental"],
+          }
+        })
+      }
+    }
   } catch {
-    return MOCK_ALERT_FEED
   }
+  return MOCK_ALERT_FEED
 }

@@ -202,16 +202,56 @@ export const MOCK_INGESTION_WORKERS: IngestionWorkerStatus[] = [
   },
 ]
 
+const BANK_WATCHLIST_META: Record<string, { name: string; subsector: string; category: string; price: number; priceChange: number }> = {
+  BBCA: { name: "PT Bank Central Asia Tbk", subsector: "Bank KBMI 4", category: "KBMI 4", price: 10250, priceChange: 1.23 },
+  BBRI: { name: "PT Bank Rakyat Indonesia Tbk", subsector: "Bank KBMI 4 / Mikro", category: "KBMI 4", price: 4720, priceChange: -2.48 },
+  BMRI: { name: "PT Bank Mandiri (Persero) Tbk", subsector: "Bank KBMI 4", category: "KBMI 4", price: 6950, priceChange: 0.72 },
+  BBNI: { name: "PT Bank Negara Indonesia Tbk", subsector: "Bank KBMI 4", category: "KBMI 4", price: 5425, priceChange: 0.46 },
+  BRIS: { name: "PT Bank Syariah Indonesia Tbk", subsector: "Bank Syariah KBMI 3", category: "KBMI 3", price: 2740, priceChange: -0.72 },
+  BBTN: { name: "PT Bank Tabungan Negara (Persero) Tbk", subsector: "Bank KBMI 3 / KPR", category: "KBMI 3", price: 1340, priceChange: -2.19 },
+  BDMN: { name: "PT Bank Danamon Indonesia Tbk", subsector: "Bank KBMI 3", category: "KBMI 3", price: 2920, priceChange: 0.34 },
+}
+
 export async function getWatchedStocks(): Promise<WatchedStock[]> {
-  if (!API_BASE_URL) return MOCK_WATCHED_STOCKS
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/watchlist`)
-    if (!res.ok) throw new Error("Gagal mengambil daftar watchlist")
-    const json = await res.json()
-    return json.data || json
+    const res = await fetch(`${baseUrl}/api/v1/fundamental-score`, { cache: "no-store" })
+    if (res.ok) {
+      const json = await res.json()
+      const list = Array.isArray(json) ? json : json.data || []
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((item: { ticker: string; skor_akhir?: number; health_status?: string; kuartal?: string }) => {
+          const meta = BANK_WATCHLIST_META[item.ticker] || {
+            name: `PT Bank ${item.ticker} Tbk`,
+            subsector: "Bank KBMI 3",
+            category: "KBMI 3",
+            price: 2500,
+            priceChange: 0.0,
+          }
+          const score = Math.round(item.skor_akhir ?? 70)
+          let status: "Stabil" | "Waspada" | "Perhatian Khusus" = "Stabil"
+          if (item.health_status === "Sangat Sehat" || item.health_status === "Sehat" || score >= 75) status = "Stabil"
+          else if (item.health_status === "Waspada" || score >= 60) status = "Waspada"
+          else status = "Perhatian Khusus"
+          return {
+            ticker: item.ticker,
+            name: meta.name,
+            subsector: meta.subsector,
+            category: meta.category,
+            addedAt: item.kuartal || "Q2 2026",
+            ingestionStatus: "Lengkap" as const,
+            ingestionDetail: `Skor ${score}/100`,
+            fundamentalScore: score,
+            status,
+            price: meta.price,
+            priceChange: meta.priceChange,
+          }
+        })
+      }
+    }
   } catch {
-    return MOCK_WATCHED_STOCKS
   }
+  return MOCK_WATCHED_STOCKS
 }
 
 export async function searchStocks(query: string): Promise<SearchStockResult[]> {

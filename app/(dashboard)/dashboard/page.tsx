@@ -2,7 +2,7 @@ import React from "react"
 import { Metadata } from "next"
 import Link from "next/link"
 import { StockCard } from "@/src/entities/stock"
-import { CompositeAlertHero, getPrimaryAlert } from "@/src/features/composite-alert"
+import { CompositeAlertHero, getPrimaryAlert, getAlertFeed } from "@/src/features/composite-alert"
 import { getWatchedStocks } from "@/src/features/watchlist"
 
 export const metadata: Metadata = {
@@ -11,61 +11,30 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const [primaryAlert, stocks] = await Promise.all([
+  const [primaryAlert, stocks, feedItems] = await Promise.all([
     getPrimaryAlert(),
     getWatchedStocks(),
+    getAlertFeed(),
   ])
 
   const enrichedStocks = stocks.map((s) => {
-    if (s.ticker === "BBRI") {
-      return {
-        ...s,
-        analystCoverage: 32,
-        isAlertTrigger: true,
-        pillarMetrics: {
-          nimScore: 75,
-          sentimentScore: -0.15,
-          sentimentTrend: [0.1, 0.05, -0.05, -0.1, -0.15],
-          foreignFlowLabel: "Outflow -Rp 89M",
-          foreignFlowStatus: "outflow" as const,
-        },
-      }
-    }
-    if (s.ticker === "BBCA") {
-      return {
-        ...s,
-        analystCoverage: 32,
-        pillarMetrics: {
-          nimScore: 88,
-          sentimentScore: 0.62,
-          sentimentTrend: [0.4, 0.45, 0.5, 0.58, 0.62],
-          foreignFlowLabel: "Inflow (+Rp 142M)",
-          foreignFlowStatus: "inflow" as const,
-        },
-      }
-    }
-    if (s.ticker === "BMRI") {
-      return {
-        ...s,
-        analystCoverage: 28,
-        pillarMetrics: {
-          nimScore: 82,
-          sentimentScore: 0.45,
-          sentimentTrend: [0.35, 0.38, 0.4, 0.42, 0.45],
-          foreignFlowLabel: "Inflow (+Rp 41M)",
-          foreignFlowStatus: "inflow" as const,
-        },
-      }
-    }
+    const alert = feedItems.find((f) => f.ticker === s.ticker)
+    const isAlertTrigger = s.ticker === primaryAlert.ticker || alert?.status === "Perhatian Khusus"
+    const zScore = alert?.zScore ?? 0
+    const flowStatus = zScore <= -2.0 ? ("outflow" as const) : zScore >= 2.0 ? ("inflow" as const) : ("normal" as const)
+    const flowLabel = zScore <= -2.0 ? `Outflow (${zScore}σ)` : zScore >= 2.0 ? `Inflow (+${zScore}σ)` : "Normal"
+
     return {
       ...s,
-      analystCoverage: 24,
+      analystCoverage: 28,
+      isAlertTrigger,
+      alertMessage: alert?.title,
       pillarMetrics: {
-        nimScore: 79,
-        sentimentScore: 0.31,
-        sentimentTrend: [0.25, 0.28, 0.3, 0.31, 0.31],
-        foreignFlowLabel: "Normal (+Rp 18M)",
-        foreignFlowStatus: "normal" as const,
+        nimScore: s.fundamentalScore,
+        sentimentScore: alert?.policyExposure ?? 0,
+        sentimentTrend: [0.1, 0.15, 0.2, 0.22, alert?.policyExposure ?? 0.25],
+        foreignFlowLabel: flowLabel,
+        foreignFlowStatus: flowStatus,
       },
     }
   })

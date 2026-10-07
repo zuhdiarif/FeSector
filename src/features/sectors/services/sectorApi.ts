@@ -150,31 +150,31 @@ export const MOCK_SECTORS: SectorItem[] = [
 ]
 
 export async function getSectorRanking(): Promise<SectorItem[]> {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/sectors/ranking`, {
+    const res = await fetch(`${baseUrl}/api/v1/sectors/ranking`, {
       cache: "no-store",
     })
     if (res.ok) {
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) return data
     }
-  } catch (err) {
-    console.warn("[getSectorRanking] API call failed, fallback to mock:", err)
+  } catch {
   }
   return [...MOCK_SECTORS].sort((a, b) => b.smrs_score - a.smrs_score)
 }
 
 export async function getSectorOverview(slug: string): Promise<SectorOverview> {
   const lowerSlug = slug.toLowerCase()
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/sectors/${lowerSlug}/overview`, {
+    const res = await fetch(`${baseUrl}/api/v1/sectors/${lowerSlug}/overview`, {
       cache: "no-store",
     })
     if (res.ok) {
       return await res.json()
     }
-  } catch (err) {
-    console.warn(`[getSectorOverview] API call failed for ${slug}, fallback to mock:`, err)
+  } catch {
   }
 
   const found = MOCK_SECTORS.find((s) => s.sector_slug === lowerSlug) || MOCK_SECTORS[0]
@@ -200,8 +200,9 @@ export async function getSectorNews(
   subsector?: string,
   limit: number = 10
 ): Promise<SectorNewsItem[]> {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const url = new URL(`${API_BASE_URL}/api/v1/sectors/${slug.toLowerCase()}/news`)
+    const url = new URL(`${baseUrl}/api/v1/sectors/${slug.toLowerCase()}/news`)
     if (subsector) url.searchParams.set("sub_sector", subsector)
     url.searchParams.set("limit", limit.toString())
 
@@ -210,8 +211,7 @@ export async function getSectorNews(
       const data = await res.json()
       if (Array.isArray(data)) return data
     }
-  } catch (err) {
-    console.warn(`[getSectorNews] API call failed for ${slug}:`, err)
+  } catch {
   }
 
   return [
@@ -233,16 +233,16 @@ export async function getSectorNews(
 }
 
 export async function getSectorAlerts(): Promise<SectorRotationAlert[]> {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/sectors/alerts`, {
+    const res = await fetch(`${baseUrl}/api/v1/sectors/alerts`, {
       cache: "no-store",
     })
     if (res.ok) {
       const data = await res.json()
       if (Array.isArray(data.alerts)) return data.alerts
     }
-  } catch (err) {
-    console.warn("[getSectorAlerts] API call failed, fallback:", err)
+  } catch {
   }
 
   return [

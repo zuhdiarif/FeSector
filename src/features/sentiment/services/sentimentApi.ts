@@ -452,7 +452,7 @@ export async function getArticlesFeed(ticker = "BBCA", category = "") {
 }
 
 export async function syncLiveNews(): Promise<{ status: string; message: string; data?: unknown }> {
-  const baseUrl = API_BASE_URL || ""
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
     const res = await fetch(`${baseUrl}/api/v1/sync/news`, {
       method: "POST",
