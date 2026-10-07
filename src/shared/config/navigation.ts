@@ -40,6 +40,18 @@ export const MAIN_NAV_ITEMS: readonly NavItem[] = [
     pathKey: "feed-sinyal-gabungan",
   },
   {
+    title: "Sektor Hub & Rotasi",
+    href: ROUTES.SECTORS,
+    icon: "hub",
+    pathKey: "sektor-hub",
+  },
+  {
+    title: "Komunitas Intel",
+    href: ROUTES.COMMUNITY,
+    icon: "groups",
+    pathKey: "komunitas-intel",
+  },
+  {
     title: "Kelola Watchlist",
     href: ROUTES.WATCHLIST,
     icon: "bookmark",

@@ -25,6 +25,8 @@ const ITEMS: PaletteItem[] = [
   { id: "p-4", title: "Perbandingan Antar-Saham", subtitle: "Benchmarking komparatif multi-emiten", path: "/compare", category: "Halaman", icon: "compare_arrows" },
   { id: "p-5", title: "Kelola Watchlist", subtitle: "Manajemen pool emiten yang dipantau", path: "/watchlist", category: "Halaman", icon: "bookmark" },
   { id: "p-6", title: "Metodologi Skor", subtitle: "Dokumentasi formula matematis & transparansi model", path: "/methodology", category: "Halaman", icon: "analytics" },
+  { id: "p-7", title: "Sektor Hub & Rotasi", subtitle: "Heatmap 11 sektor IDX-IC & momentum rotasi SMRS", path: "/sectors", category: "Halaman", icon: "hub" },
+  { id: "p-8", title: "Komunitas Intel", subtitle: "Forum diskusi sentimen & alert divergensi ritel vs asing", path: "/community", category: "Halaman", icon: "groups" },
   { id: "s-1", title: "BBRI — Bank Rakyat Indonesia", subtitle: "KBMI 4 • Anomali Outflow Masif (-2.80σ)", path: "/stock/BBRI", category: "Emiten", icon: "account_balance", badge: "Perhatian Khusus" },
   { id: "s-2", title: "BBCA — Bank Central Asia", subtitle: "KBMI 4 • Skor Fundamental 84 (Stabil)", path: "/stock/BBCA", category: "Emiten", icon: "account_balance", badge: "Stabil" },
   { id: "s-3", title: "BMRI — Bank Mandiri", subtitle: "KBMI 4 • CASA Tinggi & Pertumbuhan Simpanan", path: "/stock/BMRI", category: "Emiten", icon: "account_balance", badge: "Stabil" },

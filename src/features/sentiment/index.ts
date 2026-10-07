@@ -4,3 +4,5 @@ export * from "./components/SentimentSparkline"
 export * from "./components/SentimentCard"
 export * from "./components/PolicyExposureCard"
 export * from "./components/ArticleList"
+export * from "./components/SyncNewsButton"
+

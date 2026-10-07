@@ -308,15 +308,165 @@ function createFallbackSentiment(ticker: string): SentimentData {
   }
 }
 
-export async function getSentimentData(ticker: string): Promise<SentimentData> {
-  const upper = (ticker || "BBRI").toUpperCase()
-  if (!API_BASE_URL) return MOCK_SENTIMENT_DATA[upper] || createFallbackSentiment(upper)
+interface BackendRawArticle {
+  id?: number
+  judul: string
+  snippet: string
+  url: string
+  tanggal_publikasi: string
+}
+
+interface BackendProcessedArticle {
+  id?: number
+  category: "company_specific" | "macro_policy"
+  affected_entities: string
+  sentiment_score: number
+  confidence: number
+  reasoning: string
+  raw_article?: BackendRawArticle
+}
+
+interface BackendSentimentOverview {
+  ticker: string
+  company_sentiment_score: number
+  policy_exposure_score: number
+  trend_30_days?: Array<{
+    tanggal: string
+    company_sentiment_score: number
+    policy_exposure_score: number
+  }>
+  top_articles?: BackendProcessedArticle[]
+}
+
+function getSentimentLabel(score: number): string {
+  if (score >= 0.5) return "Sangat Positif"
+  if (score >= 0.15) return "Positif"
+  if (score >= -0.15) return "Netral"
+  if (score >= -0.4) return "Waspada / Netral-Negatif"
+  return "Negatif Signifikan"
+}
+
+function mapProcessedArticleToItem(art: BackendProcessedArticle, idx: number) {
+  const title = art.raw_article?.judul || "Pembaruan Analisis Sentimen & Regulasi"
+  const url = art.raw_article?.url || "https://bisnis.com"
+  let source = "Media Finansial"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/sentiment/${upper}`)
-    if (!res.ok) throw new Error("Gagal mengambil data sentimen")
-    const json = await res.json()
-    return json.data || json
+    const domain = new URL(url).hostname.replace("www.", "")
+    source = domain.split(".")[0].toUpperCase()
   } catch {
-    return MOCK_SENTIMENT_DATA[upper] || createFallbackSentiment(upper)
+    source = "Bisnis / CNBC"
+  }
+
+  const d = art.raw_article?.tanggal_publikasi ? new Date(art.raw_article.tanggal_publikasi) : new Date()
+  const publishedAt = !isNaN(d.getTime())
+    ? d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " WIB"
+    : "24 Sep 2026, 09:00 WIB"
+
+  return {
+    id: `art-live-${art.id || idx}`,
+    title,
+    source,
+    publishedAt,
+    url,
+    category: art.category,
+    categoryLabel: art.category === "macro_policy" ? "KEBIJAKAN MAKRO" : "SPESIFIK PERUSAHAAN",
+    sentimentScore: Number(art.sentiment_score.toFixed(2)),
+    sentimentLabel: getSentimentLabel(art.sentiment_score),
+    confidence: Math.round((art.confidence || 0.9) * 100),
+    decayWeight: 0.88,
+    affectedEntities: art.affected_entities || "Perbankan Nasional",
+    reasoning: art.reasoning || "Pengaruh regulasi dan dinamika operasional terhadap perbankan.",
+    quote: art.raw_article?.snippet || art.reasoning,
+    timeDecayLabel: "Terkini (Live Feed)",
   }
 }
+
+export async function getSentimentData(ticker: string): Promise<SentimentData> {
+  const upper = (ticker || "BBRI").toUpperCase()
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const [overviewRes, articlesRes] = await Promise.all([
+      fetch(`${baseUrl}/api/v1/sentiment/${upper}`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/v1/sentiment/${upper}/articles`, { cache: "no-store" }),
+    ])
+
+    const overview: BackendSentimentOverview = overviewRes.ok ? await overviewRes.json() : null
+    const articlesList: BackendProcessedArticle[] = articlesRes.ok ? await articlesRes.json() : []
+
+    if (overview && typeof overview.company_sentiment_score === "number") {
+      const mockFallback = MOCK_SENTIMENT_DATA[upper] || createFallbackSentiment(upper)
+      const mappedArticles = Array.isArray(articlesList) && articlesList.length > 0
+        ? articlesList.map(mapProcessedArticleToItem)
+        : (overview.top_articles && overview.top_articles.length > 0)
+        ? overview.top_articles.map(mapProcessedArticleToItem)
+        : mockFallback.articles
+
+      const trend = (overview.trend_30_days && overview.trend_30_days.length > 0)
+        ? overview.trend_30_days.slice(0, 7).map((t) => Number(t.company_sentiment_score.toFixed(2)))
+        : mockFallback.sampleTrend7d
+
+      const companyCount = mappedArticles.filter((a) => a.category === "company_specific").length
+      const policyCount = mappedArticles.filter((a) => a.category === "macro_policy").length
+
+      return {
+        ticker: upper,
+        companySentimentScore: Number(overview.company_sentiment_score.toFixed(2)),
+        companySentimentLabel: getSentimentLabel(overview.company_sentiment_score),
+        policyExposureScore: Number(overview.policy_exposure_score.toFixed(2)),
+        policyExposureLabel: getSentimentLabel(overview.policy_exposure_score),
+        totalArticles: mappedArticles.length || mockFallback.totalArticles,
+        companyArticlesCount: companyCount || mockFallback.companyArticlesCount,
+        policyArticlesCount: policyCount || mockFallback.policyArticlesCount,
+        averageConfidence: 92.5,
+        sampleTrend7d: trend,
+        dominantIssue: mockFallback.dominantIssue,
+        dominantRegulation: mockFallback.dominantRegulation,
+        articles: mappedArticles,
+      }
+    }
+  } catch {
+  }
+  return MOCK_SENTIMENT_DATA[upper] || createFallbackSentiment(upper)
+}
+
+export async function getArticlesFeed(ticker = "BBCA", category = "") {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const url = category
+      ? `${baseUrl}/api/v1/sentiment/${ticker}/articles?category=${encodeURIComponent(category)}`
+      : `${baseUrl}/api/v1/sentiment/${ticker}/articles`
+    const res = await fetch(url, { cache: "no-store" })
+    if (res.ok) {
+      const list: BackendProcessedArticle[] = await res.json()
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map(mapProcessedArticleToItem)
+      }
+    }
+  } catch {
+  }
+  const fallback = MOCK_SENTIMENT_DATA[ticker] || MOCK_SENTIMENT_DATA["BBRI"]
+  if (category) {
+    return fallback.articles.filter((a) => a.category === category)
+  }
+  return fallback.articles
+}
+
+export async function syncLiveNews(): Promise<{ status: string; message: string; data?: unknown }> {
+  const baseUrl = API_BASE_URL || ""
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/sync/news`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(text || "Sinkronisasi gagal")
+    }
+    const data = await res.json()
+    return { status: "success", message: "Sinkronisasi berita live Sectors API & AI berhasil", data }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Gagal menghubungi backend untuk sync"
+    return { status: "error", message: msg }
+  }
+}
+

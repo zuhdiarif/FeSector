@@ -412,15 +412,166 @@ function createFallbackForeignFlow(ticker: string): ForeignFlowDetail {
   }
 }
 
+interface BackendDailyFlow {
+  id?: number
+  ticker: string
+  tanggal: string
+  net_foreign_inflow: number
+}
+
+interface BackendAnomalyBrokerDetail {
+  kode_broker: string
+  nama_broker: string
+  kategori: string
+  net_value: number
+}
+
+export interface BackendFlowAnomaly {
+  id?: number
+  ticker: string
+  tanggal: string
+  net_foreign_inflow: number
+  z_score: number
+  status_anomali: string
+  broker_details?: BackendAnomalyBrokerDetail[]
+}
+
 export async function getForeignFlowData(ticker: string): Promise<ForeignFlowDetail> {
   const upper = (ticker || "BBRI").toUpperCase()
-  if (!API_BASE_URL) return MOCK_FOREIGN_FLOW_DATA[upper] || createFallbackForeignFlow(upper)
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/foreign-flow/${upper}`)
-    if (!res.ok) throw new Error("Gagal mengambil data foreign flow")
-    const json = await res.json()
-    return json.data || json
+    const [flowsRes, anomaliesRes] = await Promise.all([
+      fetch(`${baseUrl}/api/v1/foreign-flow/${upper}`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/v1/foreign-flow/${upper}/anomalies`, { cache: "no-store" }),
+    ])
+
+    const flows: BackendDailyFlow[] = flowsRes.ok ? await flowsRes.json() : []
+    const anomalies: BackendFlowAnomaly[] = anomaliesRes.ok ? await anomaliesRes.json() : []
+
+    if (Array.isArray(flows) && flows.length > 0) {
+      const mockFallback = MOCK_FOREIGN_FLOW_DATA[upper] || createFallbackForeignFlow(upper)
+      const values = flows.map((f) => f.net_foreign_inflow)
+      const sum = values.reduce((acc, v) => acc + v, 0)
+      const mean = sum / values.length
+      const variance = values.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / values.length
+      const stdDev = Math.sqrt(variance) || 1
+
+      const latestFlow = flows[0].net_foreign_inflow
+      const latestZScore = stdDev > 0 ? (latestFlow - mean) / stdDev : 0
+      const isAnomaly = Math.abs(latestZScore) >= 2.0
+
+      const flowPoints = flows.slice(0, 30).reverse().map((f) => {
+        const d = new Date(f.tanggal)
+        const displayDate = !isNaN(d.getTime())
+          ? d.toLocaleDateString("id-ID", { day: "2-digit", month: "short" })
+          : f.tanggal
+        const z = stdDev > 0 ? (f.net_foreign_inflow - mean) / stdDev : 0
+        const isAnom = Math.abs(z) >= 2.0
+        return {
+          date: f.tanggal,
+          displayDate,
+          netFlow: Number((f.net_foreign_inflow / 1000000000).toFixed(1)),
+          zScore: Number(z.toFixed(2)),
+          isAnomaly: isAnom,
+          anomalyType: isAnom ? (z < 0 ? ("outflow" as const) : ("inflow" as const)) : undefined,
+        }
+      })
+
+      const anomalies14d = (Array.isArray(anomalies) && anomalies.length > 0)
+        ? anomalies.map((a, idx) => {
+            const d = new Date(a.tanggal)
+            const displayDate = !isNaN(d.getTime())
+              ? d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+              : a.tanggal
+            const bestBroker = a.broker_details && a.broker_details.length > 0
+              ? a.broker_details.reduce((prev, cur) => Math.abs(cur.net_value) > Math.abs(prev.net_value) ? cur : prev)
+              : { kode_broker: "CS", nama_broker: "Institusi Asing", kategori: "Asing-Institusional", net_value: a.net_foreign_inflow }
+
+            return {
+              id: `anom-${idx + 1}`,
+              date: a.tanggal,
+              displayDate,
+              netFlow: a.net_foreign_inflow,
+              netFlowFormatted: `${a.net_foreign_inflow >= 0 ? "+" : "-"}Rp ${(Math.abs(a.net_foreign_inflow) / 1000000000).toFixed(1)} M`,
+              zScore: Number(a.z_score.toFixed(2)),
+              dominantBroker: {
+                code: bestBroker.kode_broker,
+                name: bestBroker.nama_broker,
+                category: bestBroker.kategori,
+                netValue: bestBroker.net_value,
+              },
+              action: (a.net_foreign_inflow >= 0 ? "Net Buy" : "Net Sell") as "Net Buy" | "Net Sell",
+              isExtreme: Math.abs(a.z_score) >= 2.5,
+            }
+          })
+        : mockFallback.anomalies14d
+
+      const totalT = Math.abs(sum) >= 1e12
+        ? `${sum >= 0 ? "+" : "-"}Rp ${(Math.abs(sum) / 1e12).toFixed(2)} T`
+        : `${sum >= 0 ? "+" : "-"}Rp ${(Math.abs(sum) / 1e9).toFixed(1)} M`
+
+      return {
+        ticker: upper,
+        bankName: mockFallback.bankName,
+        yesterdayFlow: latestFlow,
+        yesterdayZScore: Number(latestZScore.toFixed(2)),
+        yesterdayAnomalyStatus: isAnomaly
+          ? latestZScore < 0 ? `Outflow Ekstrem (${Math.abs(latestZScore).toFixed(1)}x σ normal)` : `Inflow Ekstrem (${latestZScore.toFixed(1)}x σ normal)`
+          : `Normal (${latestZScore >= 0 ? "+" : ""}${latestZScore.toFixed(2)}σ)`,
+        baselineMean90d: mean,
+        standardDeviation: stdDev,
+        totalNetFlow90d: sum,
+        totalNetFlowFormatted: totalT,
+        anomalyCount90d: anomalies.length || mockFallback.anomalyCount90d,
+        inflowAnomalyCount: anomalies.filter((a) => a.z_score > 0).length || mockFallback.inflowAnomalyCount,
+        outflowAnomalyCount: anomalies.filter((a) => a.z_score < 0).length || mockFallback.outflowAnomalyCount,
+        synthesisSentence: mockFallback.synthesisSentence,
+        synthesisConfidence: mockFallback.synthesisConfidence,
+        composition14d: mockFallback.composition14d,
+        anomalies14d,
+        flowPoints,
+      }
+    }
   } catch {
-    return MOCK_FOREIGN_FLOW_DATA[upper] || createFallbackForeignFlow(upper)
+  }
+  return MOCK_FOREIGN_FLOW_DATA[upper] || createFallbackForeignFlow(upper)
+}
+
+export async function getForeignFlowSummary(): Promise<BackendFlowAnomaly[]> {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/foreign-flow/summary`, {
+      cache: "no-store",
+    })
+    if (!res.ok) throw new Error("Gagal mengambil ringkasan anomali asing")
+    const list: BackendFlowAnomaly[] = await res.json()
+    return list
+  } catch {
+    return [
+      {
+        id: 1,
+        ticker: "BBRI",
+        tanggal: "2026-09-24",
+        net_foreign_inflow: -145000000000,
+        z_score: -2.8,
+        status_anomali: "ANOMALI_OUTFLOW",
+        broker_details: [
+          { kode_broker: "CS", nama_broker: "Credit Suisse Sekuritas", kategori: "Asing-Institusional", net_value: -89100000000 },
+          { kode_broker: "ZP", nama_broker: "Maybank Sekuritas", kategori: "Asing-Institusional", net_value: -34000000000 },
+        ],
+      },
+      {
+        id: 2,
+        ticker: "BBCA",
+        tanggal: "2026-09-23",
+        net_foreign_inflow: 220000000000,
+        z_score: 2.45,
+        status_anomali: "ANOMALI_INFLOW",
+        broker_details: [
+          { kode_broker: "AK", nama_broker: "UBS Sekuritas Indonesia", kategori: "Asing-Institusional", net_value: 125000000000 },
+        ],
+      },
+    ]
   }
 }
+
