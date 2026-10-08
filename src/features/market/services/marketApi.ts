@@ -335,6 +335,7 @@ export async function getStockQuotes(): Promise<StockQuote[]> {
             id: item.id,
             ticker: String(item.ticker || ""),
             name: item.name ? String(item.name) : undefined,
+            sector: item.sector ? String(item.sector) : undefined,
             price: Number(item.price ?? item.close ?? 0),
             change: Number(item.change ?? 0),
             change_percent: Number(item.change_percent ?? item.changePercent ?? 0),

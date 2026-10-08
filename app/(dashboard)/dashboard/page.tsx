@@ -1,7 +1,7 @@
 import React from "react"
 import { Metadata } from "next"
 import Link from "next/link"
-import { StockCard, AnomalyBadge } from "@/src/entities/stock"
+import { AnomalyBadge, DashboardStockSection } from "@/src/entities/stock"
 import { CompositeAlertHero, getPrimaryAlert, getAlertFeed } from "@/src/features/composite-alert"
 import { getWatchedStocks } from "@/src/features/watchlist"
 import { getForeignFlowSummary, getForeignFlowData } from "@/src/features/foreign-flow"
@@ -11,7 +11,7 @@ import { getSectorRanking, getSectorAlerts, SectorRotationAlertBanner } from "@/
 
 export const metadata: Metadata = {
   title: "Dashboard Utama",
-  description: "Terminal intelijen sektor finansial Indonesia dan deteksi anomali 3 pilar pasar",
+  description: "Terminal intelijen seluruh emiten IHSG dan deteksi anomali 3 pilar pasar modal Indonesia",
 }
 
 const BANK_TICKERS = [
@@ -260,11 +260,11 @@ export default async function DashboardPage() {
         <div className="flex flex-wrap items-center gap-space-sm">
           <div className="flex items-center gap-space-xs">
             <span className="font-mono text-tabular-sm text-text-secondary tracking-widest uppercase">
-              INTEL / IDX:FINANCE
+              INTEL / IDX:COMPOSITE
             </span>
             <span className="text-border-subtle">/</span>
             <h1 className="font-headline-md text-headline-md text-text-primary tracking-tight font-semibold">
-              Ringkasan Sektor Finansial
+              Terminal Pasar Modal Indonesia (IHSG)
             </h1>
           </div>
           <Link
@@ -307,31 +307,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-space-md mb-space-lg">
-        {enrichedStocks.length === 0 ? (
-          <div className="col-span-full p-space-xl bg-surface-card rounded border border-dashed border-border-subtle flex flex-col items-center justify-center text-center">
-            <span className="material-symbols-outlined text-[32px] text-text-secondary mb-2">
-              account_balance
-            </span>
-            <h4 className="font-headline-sm text-headline-sm font-semibold text-text-primary mb-1">
-              Belum Ada Emiten Terpilih
-            </h4>
-            <p className="font-body-sm text-body-sm text-text-secondary max-w-sm mb-3">
-              Daftar saham yang dipantau belum tersedia. Buka halaman Watchlist untuk memilih emiten perbankan.
-            </p>
-            <Link
-              href="/watchlist"
-              className="px-3 py-1.5 bg-brand-red text-text-primary text-body-sm font-semibold rounded"
-            >
-              Kelola Watchlist
-            </Link>
-          </div>
-        ) : (
-          enrichedStocks.map((stock) => (
-            <StockCard key={stock.ticker} stock={stock} />
-          ))
-        )}
-      </div>
+      <DashboardStockSection initialStocks={enrichedStocks} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
         <div className="lg:col-span-7 flex flex-col bg-surface-card p-space-lg rounded border border-border-subtle shadow-sm">
@@ -479,10 +455,10 @@ export default async function DashboardPage() {
           <div className="mt-space-md pt-space-xs flex items-center justify-between text-text-secondary font-caption text-caption border-t border-border-subtle/40">
             <span>Ambang batas anomali diset otomatis pada |Z| &gt; 2.0σ</span>
             <Link
-              href="/foreign-activity/BBRI"
+              href="/foreign-activity"
               className="text-text-primary hover:text-brand-red flex items-center gap-1 font-medium transition-colors"
             >
-              <span>Buka Matrix Broker Komplit</span>
+              <span>Buka Arus Asing & Matrix Broker</span>
               <span className="material-symbols-outlined text-[14px]">chevron_right</span>
             </Link>
           </div>

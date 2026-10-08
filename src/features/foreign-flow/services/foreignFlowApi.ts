@@ -1,5 +1,9 @@
 import { API_BASE_URL } from "@/src/shared/lib/constants"
-import { ForeignFlowDetail } from "../types/foreignFlow"
+import {
+  ForeignFlowDetail,
+  MarketForeignFlowSummary,
+  StockForeignFlowItem,
+} from "../types/foreignFlow"
 
 export const MOCK_FOREIGN_FLOW_DATA: Record<string, ForeignFlowDetail> = {
   BBRI: {
@@ -380,7 +384,7 @@ export const MOCK_FOREIGN_FLOW_DATA: Record<string, ForeignFlowDetail> = {
 function createFallbackForeignFlow(ticker: string): ForeignFlowDetail {
   return {
     ticker,
-    bankName: `PT Bank ${ticker} Tbk`,
+    bankName: `${ticker} Tbk`,
     yesterdayFlow: 15000000000,
     yesterdayZScore: 0.45,
     yesterdayAnomalyStatus: "Normal Buy (+0.45σ)",
@@ -647,4 +651,134 @@ export async function getForeignFlowAnomalies(ticker: string): Promise<BackendFl
     const summary = await getForeignFlowSummary()
     return summary.filter((a) => a.ticker.toUpperCase() === upper)
   }
+}
+
+export const MOCK_MARKET_FOREIGN_FLOW: MarketForeignFlowSummary = {
+  total_net_flow_today: 571000000000,
+  total_foreign_buy: 4850000000000,
+  total_foreign_sell: 4279000000000,
+  foreign_participation_percent: 36.5,
+  net_flow_7d: 2150000000000,
+  net_flow_30d: 5480000000000,
+  net_flow_90d: 14200000000000,
+  sector_breakdown: [
+    { sector_slug: "energy", sector_name: "Energi (Energy)", net_flow: 480500000000, status: "Akumulasi Masif" },
+    { sector_slug: "financials", sector_name: "Keuangan (Financials)", net_flow: 320000000000, status: "Akumulasi Masif" },
+    { sector_slug: "basic-materials", sector_name: "Barang Baku (Basic Materials)", net_flow: 110500000000, status: "Akumulasi Moderat" },
+    { sector_slug: "infrastructures", sector_name: "Infrastruktur (Infrastructures)", net_flow: 85000000000, status: "Akumulasi Moderat" },
+    { sector_slug: "consumer-non-cyclicals", sector_name: "Konsumen Primer (Consumer Non-Cyclicals)", net_flow: 24000000000, status: "Akumulasi Ringan" },
+    { sector_slug: "healthcare", sector_name: "Kesehatan (Healthcare)", net_flow: -12000000000, status: "Distribusi Ringan" },
+    { sector_slug: "industrials", sector_name: "Perindustrian (Industrials)", net_flow: -40000000000, status: "Distribusi Moderat" },
+    { sector_slug: "consumer-cyclicals", sector_name: "Konsumen Non-Primer (Consumer Cyclicals)", net_flow: -65000000000, status: "Distribusi Moderat" },
+    { sector_slug: "transportation-logistic", sector_name: "Transportasi (Transportation & Logistics)", net_flow: -80000000000, status: "Distribusi Moderat" },
+    { sector_slug: "technology", sector_name: "Teknologi (Technology)", net_flow: -110000000000, status: "Distribusi Masif" },
+    { sector_slug: "properties-real-estate", sector_name: "Properti (Properties & Real Estate)", net_flow: -142000000000, status: "Distribusi Masif" },
+  ],
+  history_30d: Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(Date.now() - (29 - i) * 86400000).toISOString().split("T")[0]
+    const baseFlows = [
+      120, -85, 210, 340, -150, 420, 290, -40, 180, 520,
+      -220, 310, 450, -80, 190, 260, -310, 400, 510, -120,
+      140, 390, -260, 480, 620, -180, 240, 310, -95, 571
+    ]
+    const netM = (baseFlows[i] || 150) * 1000000000
+    return {
+      date: d,
+      net_flow: netM,
+      cumulative_flow: (i * 350 + 1000) * 1000000000,
+    }
+  }),
+  top_accumulated: [
+    { ticker: "BBCA", name: "Bank Central Asia Tbk.", sector: "Keuangan", price: 6050, change_percent: 1.5, net_flow: 220000000000, dominant_broker: "AK" },
+    { ticker: "BMRI", name: "Bank Mandiri (Persero) Tbk.", sector: "Keuangan", price: 5400, change_percent: 1.2, net_flow: 145000000000, dominant_broker: "YU" },
+    { ticker: "ADRO", name: "Alamtri Resources Indonesia Tbk.", sector: "Energi", price: 2600, change_percent: 3.8, net_flow: 95000000000, dominant_broker: "ZP" },
+    { ticker: "TLKM", name: "Telkom Indonesia (Persero) Tbk.", sector: "Infrastruktur", price: 2320, change_percent: 1.4, net_flow: 68000000000, dominant_broker: "KZ" },
+    { ticker: "BRIS", name: "Bank Syariah Indonesia Tbk.", sector: "Keuangan", price: 1415, change_percent: 2.1, net_flow: 42000000000, dominant_broker: "RX" },
+  ],
+  top_distributed: [
+    { ticker: "BBRI", name: "Bank Rakyat Indonesia (Persero) Tbk.", sector: "Keuangan", price: 3820, change_percent: -0.8, net_flow: -145000000000, dominant_broker: "CS" },
+    { ticker: "GOTO", name: "GoTo Gojek Tokopedia Tbk.", sector: "Teknologi", price: 72, change_percent: -2.4, net_flow: -92000000000, dominant_broker: "BK" },
+    { ticker: "ASII", name: "Astra International Tbk.", sector: "Perindustrian", price: 5125, change_percent: -1.2, net_flow: -64000000000, dominant_broker: "CC" },
+    { ticker: "BBTN", name: "Bank Tabungan Negara (Persero) Tbk.", sector: "Keuangan", price: 1120, change_percent: -1.8, net_flow: -48000000000, dominant_broker: "CG" },
+    { ticker: "KLBF", name: "Kalbe Farma Tbk.", sector: "Kesehatan", price: 1480, change_percent: -0.7, net_flow: -32000000000, dominant_broker: "DX" },
+  ],
+}
+
+export const MOCK_STOCKS_FOREIGN_FLOW: StockForeignFlowItem[] = [
+  { ticker: "BBCA", name: "Bank Central Asia Tbk.", sector: "Keuangan", price: 6050, change_percent: 1.5, net_foreign_flow: 220000000000, foreign_buy: 680000000000, foreign_sell: 460000000000, z_score: 2.68, anomaly_status: "ANOMALI_INFLOW", accumulation_status: "Akumulasi Masif", dominant_broker: "AK" },
+  { ticker: "BMRI", name: "Bank Mandiri (Persero) Tbk.", sector: "Keuangan", price: 5400, change_percent: 1.2, net_foreign_flow: 145000000000, foreign_buy: 420000000000, foreign_sell: 275000000000, z_score: 1.82, anomaly_status: "NORMAL", accumulation_status: "Akumulasi Masif", dominant_broker: "YU" },
+  { ticker: "ADRO", name: "Alamtri Resources Indonesia Tbk.", sector: "Energi", price: 2600, change_percent: 3.8, net_foreign_flow: 95000000000, foreign_buy: 240000000000, foreign_sell: 145000000000, z_score: 2.15, anomaly_status: "ANOMALI_INFLOW", accumulation_status: "Akumulasi Masif", dominant_broker: "ZP" },
+  { ticker: "TLKM", name: "Telkom Indonesia (Persero) Tbk.", sector: "Infrastruktur", price: 2320, change_percent: 1.4, net_foreign_flow: 68000000000, foreign_buy: 210000000000, foreign_sell: 142000000000, z_score: 1.45, anomaly_status: "NORMAL", accumulation_status: "Akumulasi Moderat", dominant_broker: "KZ" },
+  { ticker: "BRIS", name: "Bank Syariah Indonesia Tbk.", sector: "Keuangan", price: 1415, change_percent: 2.1, net_foreign_flow: 42000000000, foreign_buy: 95000000000, foreign_sell: 53000000000, z_score: 1.34, anomaly_status: "NORMAL", accumulation_status: "Akumulasi Moderat", dominant_broker: "RX" },
+  { ticker: "PTBA", name: "Bukit Asam Tbk.", sector: "Energi", price: 3380, change_percent: 2.9, net_foreign_flow: 38000000000, foreign_buy: 84000000000, foreign_sell: 46000000000, z_score: 1.22, anomaly_status: "NORMAL", accumulation_status: "Akumulasi Moderat", dominant_broker: "AK" },
+  { ticker: "ANTM", name: "Aneka Tambang Tbk.", sector: "Barang Baku", price: 1530, change_percent: 2.1, net_foreign_flow: 32000000000, foreign_buy: 110000000000, foreign_sell: 78000000000, z_score: 1.15, anomaly_status: "NORMAL", accumulation_status: "Akumulasi Moderat", dominant_broker: "YU" },
+  { ticker: "ICBP", name: "Indofood CBP Sukses Makmur Tbk.", sector: "Konsumen Primer", price: 11800, change_percent: 0.8, net_foreign_flow: 24000000000, foreign_buy: 72000000000, foreign_sell: 48000000000, z_score: 0.95, anomaly_status: "NORMAL", accumulation_status: "Akumulasi Ringan", dominant_broker: "CC" },
+  { ticker: "MEDC", name: "Medco Energi Internasional Tbk.", sector: "Energi", price: 1460, change_percent: 2.4, net_foreign_flow: 21000000000, foreign_buy: 55000000000, foreign_sell: 34000000000, z_score: 0.85, anomaly_status: "NORMAL", accumulation_status: "Akumulasi Ringan", dominant_broker: "ZP" },
+  { ticker: "BBNI", name: "Bank Negara Indonesia (Persero) Tbk.", sector: "Keuangan", price: 4400, change_percent: 0.5, net_foreign_flow: 18000000000, foreign_buy: 130000000000, foreign_sell: 112000000000, z_score: 0.45, anomaly_status: "NORMAL", accumulation_status: "Netral", dominant_broker: "BK" },
+  { ticker: "MDKA", name: "Merdeka Copper Gold Tbk.", sector: "Barang Baku", price: 2340, change_percent: 1.8, net_foreign_flow: 15000000000, foreign_buy: 86000000000, foreign_sell: 71000000000, z_score: 0.52, anomaly_status: "NORMAL", accumulation_status: "Netral", dominant_broker: "AK" },
+  { ticker: "ISAT", name: "Indosat Tbk.", sector: "Infrastruktur", price: 2280, change_percent: 0.9, net_foreign_flow: 12000000000, foreign_buy: 48000000000, foreign_sell: 36000000000, z_score: 0.41, anomaly_status: "NORMAL", accumulation_status: "Netral", dominant_broker: "KZ" },
+  { ticker: "KLBF", name: "Kalbe Farma Tbk.", sector: "Kesehatan", price: 1480, change_percent: -0.7, net_foreign_flow: -32000000000, foreign_buy: 38000000000, foreign_sell: 70000000000, z_score: -1.25, anomaly_status: "NORMAL", accumulation_status: "Distribusi Ringan", dominant_broker: "DX" },
+  { ticker: "BBTN", name: "Bank Tabungan Negara (Persero) Tbk.", sector: "Keuangan", price: 1120, change_percent: -1.8, net_foreign_flow: -48000000000, foreign_buy: 28000000000, foreign_sell: 76000000000, z_score: -2.25, anomaly_status: "ANOMALI_OUTFLOW", accumulation_status: "Distribusi Masif", dominant_broker: "CG" },
+  { ticker: "ASII", name: "Astra International Tbk.", sector: "Perindustrian", price: 5125, change_percent: -1.2, net_foreign_flow: -64000000000, foreign_buy: 82000000000, foreign_sell: 146000000000, z_score: -1.68, anomaly_status: "NORMAL", accumulation_status: "Distribusi Moderat", dominant_broker: "CC" },
+  { ticker: "GOTO", name: "GoTo Gojek Tokopedia Tbk.", sector: "Teknologi", price: 72, change_percent: -2.4, net_foreign_flow: -92000000000, foreign_buy: 154000000000, foreign_sell: 246000000000, z_score: -1.95, anomaly_status: "NORMAL", accumulation_status: "Distribusi Masif", dominant_broker: "BK" },
+  { ticker: "BBRI", name: "Bank Rakyat Indonesia (Persero) Tbk.", sector: "Keuangan", price: 3820, change_percent: -0.8, net_foreign_flow: -145000000000, foreign_buy: 310000000000, foreign_sell: 455000000000, z_score: -2.82, anomaly_status: "ANOMALI_OUTFLOW", accumulation_status: "Distribusi Masif", dominant_broker: "CS" },
+]
+
+export async function getMarketForeignFlowSummary(): Promise<MarketForeignFlowSummary> {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/foreign-flow/market`, {
+      cache: "no-store",
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data && data.total_net_flow_today !== undefined) {
+        return data
+      }
+    }
+  } catch {
+  }
+  return MOCK_MARKET_FOREIGN_FLOW
+}
+
+export async function getAllStockForeignFlows(
+  search?: string,
+  sector?: string,
+  filter?: string,
+  limit: number = 50
+): Promise<StockForeignFlowItem[]> {
+  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  try {
+    const url = new URL(`${baseUrl}/api/v1/foreign-flow/stocks`)
+    if (search) url.searchParams.set("q", search)
+    if (sector && sector !== "ALL") url.searchParams.set("sector", sector)
+    if (filter && filter !== "ALL") url.searchParams.set("filter", filter)
+    url.searchParams.set("limit", limit.toString())
+
+    const res = await fetch(url.toString(), { cache: "no-store" })
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        return data
+      }
+    }
+  } catch {
+  }
+
+  let list = [...MOCK_STOCKS_FOREIGN_FLOW]
+  if (sector && sector !== "ALL") {
+    list = list.filter((s) => s.sector.toLowerCase().includes(sector.toLowerCase()))
+  }
+  if (search) {
+    const q = search.toLowerCase()
+    list = list.filter((s) => s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
+  }
+  if (filter === "inflow") {
+    list = list.filter((s) => s.net_foreign_flow > 0)
+  } else if (filter === "outflow") {
+    list = list.filter((s) => s.net_foreign_flow < 0)
+  } else if (filter === "anomaly") {
+    list = list.filter((s) => Math.abs(s.z_score) >= 2.0)
+  }
+  return list
 }

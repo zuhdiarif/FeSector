@@ -104,9 +104,14 @@ export function SectorHeatmap({ sectors }: SectorHeatmapProps) {
                 <h4 className="font-title-md text-title-md font-bold text-text-primary leading-tight line-clamp-1">
                   {item.sector_name.split("(")[0].trim()}
                 </h4>
-                <span className="font-mono text-caption text-text-secondary block">
-                  {item.subsectors.length} Subsektor
-                </span>
+                <div className="flex items-center justify-between font-mono text-caption text-text-secondary mt-0.5">
+                  <span>{item.subsectors.length} Subsektor</span>
+                  {item.total_companies ? (
+                    <span className="text-[11px] font-semibold text-text-primary/90">
+                      {item.total_companies} Saham
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
               <div className="mt-3 pt-2.5 border-t border-border-subtle/40 flex flex-col gap-1">
@@ -138,6 +143,15 @@ export function SectorHeatmap({ sectors }: SectorHeatmapProps) {
                     {flowMiliar} M
                   </span>
                 </div>
+
+                {item.top_movers && item.top_movers.length > 0 && (
+                  <div className="flex items-baseline justify-between text-caption font-mono text-[10px] text-text-secondary pt-0.5 border-t border-border-subtle/30 mt-0.5">
+                    <span>Top:</span>
+                    <span className="text-text-primary font-bold truncate max-w-[105px]">
+                      {item.top_movers[0]}
+                    </span>
+                  </div>
+                )}
               </div>
             </Link>
           )

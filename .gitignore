@@ -40,11 +40,22 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# docs
+# docs & AI generated artifacts
+/docs/
 *.md
 !README.md
 
-# local backend services (not tracked)
+# local backend services & AI services (not tracked)
 /backend/
 /ai-service/
+backend/
+ai-service/
+
+# databases, scraping & cache
+*.db
+*.sqlite
+*.sqlite3
+/data/
+*.csv
+*.xlsx
 

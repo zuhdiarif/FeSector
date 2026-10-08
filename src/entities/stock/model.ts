@@ -13,6 +13,7 @@ export interface Stock {
   name: string
   subsector: string
   category: string
+  sector?: string
   price: number
   priceChange: number
   fundamentalScore: number

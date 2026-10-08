@@ -5,6 +5,7 @@ export interface WatchedStock {
   name: string
   subsector: string
   category: string
+  sector?: string
   addedAt: string
   ingestionStatus: "Lengkap" | "Sinkronisasi" | "Tertunda"
   ingestionDetail?: string

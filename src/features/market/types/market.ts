@@ -23,6 +23,7 @@ export interface StockQuote {
   id?: number
   ticker: string
   name?: string
+  sector?: string
   price: number
   change?: number
   change_percent: number

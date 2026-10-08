@@ -108,8 +108,8 @@ export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
     addedAt: "20 Jan 2026",
     ingestionStatus: "Lengkap",
     ingestionDetail: "Q2/Fin + 90d",
-    fundamentalScore: 75,
-    nimScore: 73,
+    fundamentalScore: 82,
+    nimScore: 80,
     status: "Stabil",
     price: 1415,
     priceChange: 0.00,
@@ -194,47 +194,135 @@ export const MOCK_WATCHED_STOCKS: WatchedStock[] = [
 
 export const MOCK_SEARCH_STOCKS: SearchStockResult[] = [
   {
-    ticker: "BJBR",
-    name: "Bank Pembangunan Daerah Jawa Barat dan Banten Tbk",
-    subsector: "Bank KBMI 2",
-    category: "KBMI 2",
-    price: 1185,
-    priceChange: 0.85,
-    pbv: 0.82,
-    per: 7.2,
+    ticker: "BBCA",
+    name: "PT Bank Central Asia Tbk",
+    subsector: "Keuangan & Perbankan",
+    category: "KBMI 4",
+    price: 6050,
+    priceChange: -0.82,
+    pbv: 3.10,
+    per: 18.8,
+    isWatched: true,
+  },
+  {
+    ticker: "BBRI",
+    name: "PT Bank Rakyat Indonesia Tbk",
+    subsector: "Keuangan & Perbankan",
+    category: "KBMI 4",
+    price: 3140,
+    priceChange: 0.96,
+    pbv: 1.88,
+    per: 9.42,
+    isWatched: true,
+  },
+  {
+    ticker: "BMRI",
+    name: "PT Bank Mandiri (Persero) Tbk",
+    subsector: "Keuangan & Perbankan",
+    category: "KBMI 4",
+    price: 4110,
+    priceChange: 0.24,
+    pbv: 1.40,
+    per: 9.85,
+    isWatched: true,
+  },
+  {
+    ticker: "BBNI",
+    name: "PT Bank Negara Indonesia Tbk",
+    subsector: "Keuangan & Perbankan",
+    category: "KBMI 4",
+    price: 3480,
+    priceChange: 0.58,
+    pbv: 0.98,
+    per: 7.60,
+    isWatched: true,
+  },
+  {
+    ticker: "TLKM",
+    name: "Telkom Indonesia (Persero) Tbk",
+    subsector: "Infrastruktur & Telco",
+    category: "Utama",
+    price: 2310,
+    priceChange: 1.32,
+    pbv: 2.10,
+    per: 14.5,
     isWatched: false,
   },
   {
-    ticker: "BJTM",
-    name: "Bank Pembangunan Daerah Jawa Timur Tbk",
-    subsector: "Bank KBMI 2",
-    category: "KBMI 2",
-    price: 640,
-    priceChange: -0.78,
-    pbv: 0.79,
-    per: 6.9,
-    isWatched: false,
-  },
-  {
-    ticker: "BDMN",
-    name: "PT Bank Danamon Indonesia Tbk",
-    subsector: "Bank KBMI 3",
-    category: "KBMI 3",
-    price: 2920,
-    priceChange: 0.34,
-    pbv: 0.65,
-    per: 8.4,
-    isWatched: false,
-  },
-  {
-    ticker: "BNGA",
-    name: "PT Bank CIMB Niaga Tbk",
-    subsector: "Bank KBMI 3",
-    category: "KBMI 3",
-    price: 1890,
-    priceChange: 1.10,
-    pbv: 0.88,
+    ticker: "ASII",
+    name: "Astra International Tbk",
+    subsector: "Perindustrian & Otomotif",
+    category: "Utama",
+    price: 4780,
+    priceChange: -0.83,
+    pbv: 0.95,
     per: 6.8,
+    isWatched: false,
+  },
+  {
+    ticker: "GOTO",
+    name: "GoTo Gojek Tokopedia Tbk",
+    subsector: "Teknologi",
+    category: "Ekonomi Baru",
+    price: 30,
+    priceChange: -3.23,
+    pbv: 0.65,
+    per: 15.0,
+    isWatched: false,
+  },
+  {
+    ticker: "ADRO",
+    name: "Alamtri Resources Indonesia Tbk",
+    subsector: "Energi & Batubara",
+    category: "Utama",
+    price: 2600,
+    priceChange: 0.0,
+    pbv: 0.85,
+    per: 4.2,
+    isWatched: false,
+  },
+  {
+    ticker: "ICBP",
+    name: "Indofood CBP Sukses Makmur Tbk",
+    subsector: "Barang Konsumen Primer",
+    category: "Utama",
+    price: 10450,
+    priceChange: 0.48,
+    pbv: 2.80,
+    per: 14.2,
+    isWatched: false,
+  },
+  {
+    ticker: "ANTM",
+    name: "Aneka Tambang Tbk",
+    subsector: "Barang Baku & Tambang",
+    category: "Utama",
+    price: 1480,
+    priceChange: 1.37,
+    pbv: 1.45,
+    per: 12.1,
+    isWatched: false,
+  },
+  {
+    ticker: "KLBF",
+    name: "Kalbe Farma Tbk",
+    subsector: "Kesehatan & Farmasi",
+    category: "Utama",
+    price: 755,
+    priceChange: 0.0,
+    pbv: 2.90,
+    per: 21.0,
+    isWatched: false,
+  },
+  {
+    ticker: "CTRA",
+    name: "Ciputra Development Tbk",
+    subsector: "Properti & Real Estat",
+    category: "Utama",
+    price: 545,
+    priceChange: 0.93,
+    pbv: 0.82,
+    per: 8.5,
     isWatched: false,
   },
   {
@@ -242,10 +330,10 @@ export const MOCK_SEARCH_STOCKS: SearchStockResult[] = [
     name: "PT Bank Syariah Indonesia Tbk",
     subsector: "Bank Syariah KBMI 3",
     category: "KBMI 3",
-    price: 2740,
-    priceChange: -0.72,
-    pbv: 2.65,
-    per: 18.4,
+    price: 1415,
+    priceChange: 0.00,
+    pbv: 1.85,
+    per: 12.5,
     isWatched: true,
   },
   {
@@ -253,10 +341,10 @@ export const MOCK_SEARCH_STOCKS: SearchStockResult[] = [
     name: "PT Bank Tabungan Negara (Persero) Tbk",
     subsector: "Bank KBMI 3 / KPR",
     category: "KBMI 3",
-    price: 1340,
-    priceChange: -2.19,
-    pbv: 0.58,
-    per: 6.2,
+    price: 1065,
+    priceChange: 0.00,
+    pbv: 0.48,
+    per: 4.8,
     isWatched: true,
   },
 ]
@@ -343,6 +431,7 @@ export const BANK_WATCHLIST_META: Record<
 export interface BackendStockQuote {
   ticker?: string
   name?: string
+  sector?: string
   price?: number
   close?: number
   change?: number
@@ -351,6 +440,33 @@ export interface BackendStockQuote {
   coverage?: number
   analyst_coverage?: number
   analystCoverage?: number
+}
+
+const FALLBACK_SCORES: Record<string, { fundamentalScore: number; nimScore: number; status: "Stabil" | "Waspada" | "Perhatian Khusus" }> = {
+  BBCA: { fundamentalScore: 88, nimScore: 85, status: "Stabil" },
+  BMRI: { fundamentalScore: 86, nimScore: 78, status: "Stabil" },
+  BBRI: { fundamentalScore: 85, nimScore: 92, status: "Stabil" },
+  BRIS: { fundamentalScore: 82, nimScore: 80, status: "Stabil" },
+  BBNI: { fundamentalScore: 79, nimScore: 68, status: "Stabil" },
+  BNGA: { fundamentalScore: 78, nimScore: 72, status: "Stabil" },
+  BDMN: { fundamentalScore: 73, nimScore: 74, status: "Stabil" },
+  BJTM: { fundamentalScore: 68, nimScore: 78, status: "Stabil" },
+  BJBR: { fundamentalScore: 67, nimScore: 75, status: "Stabil" },
+  PNBN: { fundamentalScore: 66, nimScore: 62, status: "Stabil" },
+  ARTO: { fundamentalScore: 63, nimScore: 95, status: "Stabil" },
+  AMAR: { fundamentalScore: 58, nimScore: 98, status: "Waspada" },
+  BBTN: { fundamentalScore: 56, nimScore: 55, status: "Waspada" },
+  AGRO: { fundamentalScore: 48, nimScore: 60, status: "Waspada" },
+  AGRS: { fundamentalScore: 46, nimScore: 52, status: "Waspada" },
+  BABP: { fundamentalScore: 43, nimScore: 48, status: "Waspada" },
+  TLKM: { fundamentalScore: 84, nimScore: 75, status: "Stabil" },
+  ASII: { fundamentalScore: 82, nimScore: 72, status: "Stabil" },
+  ICBP: { fundamentalScore: 86, nimScore: 78, status: "Stabil" },
+  ADRO: { fundamentalScore: 81, nimScore: 70, status: "Stabil" },
+  GOTO: { fundamentalScore: 46, nimScore: 35, status: "Waspada" },
+  KLBF: { fundamentalScore: 79, nimScore: 72, status: "Stabil" },
+  ANTM: { fundamentalScore: 74, nimScore: 68, status: "Stabil" },
+  CTRA: { fundamentalScore: 71, nimScore: 65, status: "Stabil" },
 }
 
 export async function getWatchedStocks(): Promise<WatchedStock[]> {
@@ -454,17 +570,24 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
       const fundItem = latestFundMap.get(ticker)
       const anomaly = anomalyMap.get(ticker)
 
+      const hash = ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
+      const dynamicFallback = FALLBACK_SCORES[ticker] || {
+        fundamentalScore: 64 + (hash % 21),
+        nimScore: 60 + ((hash * 3) % 25),
+        status: "Stabil" as const,
+      }
+
       const price = quote.price ?? quote.close ?? meta.price
       const priceChange = quote.change_percent ?? quote.changePercent ?? quote.change ?? meta.priceChange
-      const fundamentalScore = fundItem ? Math.round(fundItem.skor_akhir) : 75
-      const nimScore = fundItem ? Math.round(fundItem.nim_score) : 75
+      const fundamentalScore = fundItem ? Math.round(fundItem.skor_akhir) : dynamicFallback.fundamentalScore
+      const nimScore = fundItem ? Math.round(fundItem.nim_score) : dynamicFallback.nimScore
 
-      const rawStatus = fundItem ? fundItem.health_status || "Stabil" : "Stabil"
+      const rawStatus = fundItem ? fundItem.health_status || dynamicFallback.status : dynamicFallback.status
       const status: "Stabil" | "Waspada" | "Perhatian Khusus" = anomaly?.status_anomali === "ANOMALI_OUTFLOW"
         ? "Perhatian Khusus"
         : rawStatus === "Sangat Sehat" || rawStatus === "Sehat"
         ? "Stabil"
-        : rawStatus === "Cukup"
+        : rawStatus === "Cukup" || rawStatus === "Waspada"
         ? "Waspada"
         : "Stabil"
 
@@ -472,9 +595,32 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
         ? "KBMI 4"
         : ["BRIS", "BNGA", "BDMN", "BBTN"].includes(ticker)
         ? "KBMI 3"
-        : "KBMI 2"
+        : meta.category || "Utama"
 
-      const subsector = meta.subsector || "Perbankan Nasional"
+      const sectorRaw = quote.sector || ""
+      const subsector = sectorRaw.includes("Financial")
+        ? "Perbankan & Keuangan"
+        : sectorRaw.includes("Energy")
+        ? "Energi & Sumber Daya"
+        : sectorRaw.includes("Infrastructure")
+        ? "Infrastruktur & Telco"
+        : sectorRaw.includes("Technology")
+        ? "Teknologi"
+        : sectorRaw.includes("Consumer Non")
+        ? "Barang Konsumen Primer"
+        : sectorRaw.includes("Consumer")
+        ? "Barang Konsumen Non-Primer"
+        : sectorRaw.includes("Basic Materials")
+        ? "Barang Baku & Tambang"
+        : sectorRaw.includes("Industrials")
+        ? "Perindustrian"
+        : sectorRaw.includes("Properties")
+        ? "Properti & Real Estat"
+        : sectorRaw.includes("Healthcare")
+        ? "Kesehatan"
+        : sectorRaw.includes("Transportation")
+        ? "Transportasi & Logistik"
+        : meta.subsector || "Saham Indonesia"
       const analystCoverage = quote.coverage || quote.analyst_coverage || quote.analystCoverage || 28
 
       let quarter = "Q2"
@@ -516,6 +662,7 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
         status,
         category,
         subsector,
+        sector: quote.sector || "Financials",
         analystCoverage,
         addedAt,
         ingestionStatus: "Lengkap" as const,
@@ -531,7 +678,7 @@ export async function getWatchedStocks(): Promise<WatchedStock[]> {
 }
 
 export async function searchStocks(query: string): Promise<SearchStockResult[]> {
-  const baseUrl = API_BASE_URL || "http://localhost:8080"
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || API_BASE_URL || "http://localhost:8080"
   try {
     const res = await fetch(`${baseUrl}/api/v1/watchlist/search?q=${encodeURIComponent(query)}`, {
       cache: "no-store",
@@ -539,9 +686,23 @@ export async function searchStocks(query: string): Promise<SearchStockResult[]> 
     if (res.ok) {
       const json = await res.json()
       const list = Array.isArray(json) ? json : json.data
-      if (Array.isArray(list)) return list
+      if (Array.isArray(list) && list.length > 0) return list
     }
   } catch {
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const localRes = await fetch(`/api/v1/watchlist/search?q=${encodeURIComponent(query)}`, {
+        cache: "no-store",
+      })
+      if (localRes.ok) {
+        const localJson = await localRes.json()
+        const localList = Array.isArray(localJson) ? localJson : localJson.data
+        if (Array.isArray(localList) && localList.length > 0) return localList
+      }
+    } catch {
+    }
   }
 
   if (!query) return MOCK_SEARCH_STOCKS
